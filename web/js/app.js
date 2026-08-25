@@ -757,7 +757,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
       rank: 3,
       label: "Spot #3 (Alternative)",
       lat: Number((minLat + (dLat > 0 ? dLat * 0.40 : -0.0008)).toFixed(5)),
-      lon: Number((minLon + (dLon > 0 ? dLon * 0.80 : 0.0008)),
+      lon: Number((minLon + (dLon > 0 ? dLon * 0.80 : 0.0008)).toFixed(5)),
       gwpi_score: Number(spot3Score.toFixed(1)),
       potential_category: category,
       elevation_m: Number((elevCenter + 1.2).toFixed(1)),

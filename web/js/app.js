@@ -237,7 +237,8 @@ function initMap() {
           tiles: [
             'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
             'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
+            'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+            'https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
           ],
           tileSize: 256,
           attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
@@ -280,11 +281,21 @@ function initMap() {
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }), 'bottom-right');
 
   map.on('load', () => {
-    addCatchmentOverlay();
+    map.resize();
+    try {
+      addCatchmentOverlay();
+    } catch (err) {
+      console.warn("Catchment overlay notice:", err);
+    }
     if (defaultFarmGeoJSON) {
       renderFarmOnMap(defaultFarmGeoJSON);
       renderFarmData(defaultFarmGeoJSON.farm_analysis);
     }
+  });
+
+  // Ensure map renders properly on window resize
+  window.addEventListener('resize', () => {
+    if (map) map.resize();
   });
 
   map.on('click', handleMapClick);
@@ -306,9 +317,11 @@ function toggleSatelliteView() {
 }
 
 function addCatchmentOverlay() {
-  if (!clientGrid) return;
+  if (!clientGrid || !clientGrid.bbox) return;
   const bbox = clientGrid.bbox;
   
+  if (map.getSource('gwpi-catchment-overlay')) return;
+
   map.addSource('gwpi-catchment-overlay', {
     type: 'image',
     url: 'data/catchment_gwpi_map.png',
@@ -325,7 +338,7 @@ function addCatchmentOverlay() {
     type: 'raster',
     source: 'gwpi-catchment-overlay',
     paint: {
-      'raster-opacity': 0.65,
+      'raster-opacity': 0.0, // Default to transparent so crystal clear basemap is visible
       'raster-fade-duration': 300
     }
   });

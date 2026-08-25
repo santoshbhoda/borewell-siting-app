@@ -354,6 +354,94 @@ function renderFarmOnMap(geojson) {
   }
 }
 
+function getRegionalLithology(lat, lon) {
+  // 1. Deccan Volcanic Province / Deccan Traps (Maharashtra, N. Karnataka, NW Telangana)
+  if (
+    (lat >= 16.0 && lat <= 22.0 && lon >= 72.5 && lon <= 79.2) || // Maharashtra core & Marathwada
+    (lat >= 18.0 && lat <= 22.2 && lon >= 72.5 && lon <= 80.5) || // Vidarbha & Khandesh
+    (lat >= 15.5 && lat <= 18.0 && lon >= 74.0 && lon <= 77.5)    // N. Karnataka (Bijapur, Bidar, Belgaum)
+  ) {
+    return {
+      name: "Deccan Basalt",
+      full: "Deccan Volcanic Traps (Vesicular & Fractured Basalt Lava Flows)",
+      aquifer_type: "Vesicular Basalt & Fractured Inter-flow Contacts / Red Bole Beds",
+      drilling_technique: "DTH rotary hammer drilling with 20-30 ft casing through weathered murrum",
+      casing_depth: "20 - 40 ft",
+      typical_yield: "1,500 - 3,500 LPH"
+    };
+  }
+
+  // 2. Godavari - Pranhita Graben / Gondwana Basin (Telangana/Maharashtra border, Bhadradri, Mancherial, Chandrapur)
+  if (lat >= 17.3 && lat <= 19.9 && lon >= 79.3 && lon <= 81.2) {
+    return {
+      name: "Gondwana Sandstone",
+      full: "Lower Gondwana Supergroup (Barakar / Kamthi Sandstone & Shale)",
+      aquifer_type: "Porous Medium-to-Coarse Granular Sandstone Aquifer",
+      drilling_technique: "Direct Rotary / DTH combination with screen casing in granular layers",
+      casing_depth: "40 - 80 ft (Slotted PVC Screen)",
+      typical_yield: "3,000 - 6,500 LPH"
+    };
+  }
+
+  // 3. Proterozoic Sedimentary Basins (Cuddapah & Kurnool Basins, Palnad Basin)
+  if (lat >= 13.8 && lat <= 16.8 && lon >= 77.8 && lon <= 80.2) {
+    return {
+      name: "Limestone & Quartzite",
+      full: "Cuddapah / Kurnool Supergroup (Cavernous Limestone, Shale & Quartzite)",
+      aquifer_type: "Karst Cavernous & Secondary Jointed Fissure Zone",
+      drilling_technique: "DTH air hammer with heavy casing through clayey/cavity zones",
+      casing_depth: "40 - 60 ft",
+      typical_yield: "2,000 - 5,000 LPH"
+    };
+  }
+
+  // 4. Eastern Ghats Mobile Belt (EGMB - North Coastal AP, Odisha)
+  if (lat >= 16.5 && lat <= 20.5 && lon >= 81.6 && lon <= 85.5) {
+    return {
+      name: "Charnockite & Khondalite",
+      full: "Eastern Ghats Granulite Terrain (Charnockite, Khondalite & Quartzites)",
+      aquifer_type: "Deep Structural Fault Corridors & Foliation Shears",
+      drilling_technique: "High-pressure DTH hammer for hard granulitic rocks",
+      casing_depth: "30 - 50 ft",
+      typical_yield: "1,200 - 2,800 LPH"
+    };
+  }
+
+  // 5. Coastal Alluvial Belts (Krishna, Godavari, Cauvery Delta)
+  if (lon >= 80.2 && lat >= 10.5 && lat <= 17.5) {
+    return {
+      name: "Quaternary Alluvium",
+      full: "Deltaic & Riverine Alluvium (Sand, Gravel, Silt & Clay)",
+      aquifer_type: "Unconfined to Semi-Confined Multi-Aquifer Sand Beds",
+      drilling_technique: "Mud Rotary Drilling with Slotted Well Screen and Gravel Packing",
+      casing_depth: "Full depth slotted PVC casing with gravel pack",
+      typical_yield: "4,000 - 8,500+ LPH"
+    };
+  }
+
+  // 6. Indo-Gangetic Plains & Northern Alluvial Basin
+  if (lat >= 23.5) {
+    return {
+      name: "Indo-Gangetic Alluvium",
+      full: "Deep Alluvial Plain (Fine to Coarse Sand & Gravel Beds)",
+      aquifer_type: "Porous Sand & Gravel High-Yield Regional Aquifers",
+      drilling_technique: "Reverse/Direct Rotary with Gravel Pack & Continuous Slot Screens",
+      casing_depth: "Complete PVC/MS Screen casing",
+      typical_yield: "8,000 - 20,000+ LPH"
+    };
+  }
+
+  // 7. Peninsular Gneissic Complex & Dharwar Craton (Core Telangana, Eastern Karnataka, Central Tamil Nadu)
+  return {
+    name: "Weathered Gneiss",
+    full: "Peninsular Gneissic Complex & Dharwar Craton (Granite, Biotite Gneiss & Migmatite)",
+    aquifer_type: "Weathered Saprolite (Grus) Mantle & Deep Secondary Fracture Network",
+    drilling_technique: "DTH rotary hammer with 40-60 ft casing through weathered saprolite",
+    casing_depth: "40 - 60 ft",
+    typical_yield: "1,500 - 3,500 LPH"
+  };
+}
+
 function renderFarmData(analysis) {
   currentAnalysis = analysis;
   document.getElementById('farmNameDisplay').textContent = analysis.farm_name;
@@ -363,6 +451,12 @@ function renderFarmData(analysis) {
   
   const minElev = analysis.candidate_points[0] ? analysis.candidate_points[0].elevation_m : 335;
   document.getElementById('elevVal').textContent = `~${minElev} m`;
+
+  const lat = analysis.centroid ? analysis.centroid.lat : (analysis.candidate_points[0] ? analysis.candidate_points[0].lat : 17.433);
+  const lon = analysis.centroid ? analysis.centroid.lon : (analysis.candidate_points[0] ? analysis.candidate_points[0].lon : 79.088);
+  const litho = analysis.lithology_info || getRegionalLithology(lat, lon);
+  const lithoEl = document.getElementById('lithologyVal');
+  if (lithoEl) lithoEl.textContent = litho.name;
 
   // Summary Text
   const summaryEl = document.getElementById('summaryText');
@@ -768,11 +862,14 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     }
   ];
 
+  const litho = getRegionalLithology(cLat, cLon);
+
   const customAnalysis = {
     farm_name: customName,
     farm_area_acres: approxAcres,
     farm_area_hectares: approxHectares,
     centroid: { lon: Number(cLon.toFixed(5)), lat: Number(cLat.toFixed(5)) },
+    lithology_info: litho,
     score_statistics: {
       min: Number((meanScore - 5.0).toFixed(1)),
       max: Number((meanScore + 5.0).toFixed(1)),
@@ -803,7 +900,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     setToolMode(null);
   }
 
-  textEl.textContent = `✓ Sited: ${customName} (${category} | Slope: ${slopePct.toFixed(1)}% | Elev: ${elevCenter}m)`;
+  textEl.textContent = `✓ Sited: ${customName} (${category} | Lithology: ${litho.name} | Slope: ${slopePct.toFixed(1)}%)`;
   setTimeout(() => { banner.classList.remove('visible'); }, 4500);
 }
 
@@ -828,6 +925,10 @@ function openReportModal() {
   document.getElementById('modalScoreBadge').textContent = 
     `${currentAnalysis.score_statistics.mean} / 100 (${currentAnalysis.score_statistics.category})`;
   
+  const litho = currentAnalysis.lithology_info || getRegionalLithology(currentAnalysis.centroid.lat, currentAnalysis.centroid.lon);
+  const modalLitho = document.getElementById('modalLithology');
+  if (modalLitho) modalLitho.textContent = litho.full;
+
   document.getElementById('modalReportDate').textContent = new Date().toISOString().split('T')[0];
   document.getElementById('modalReportId').textContent = `BSMA-GW-${Date.now().toString().slice(-6)}`;
 

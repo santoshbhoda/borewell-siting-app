@@ -57,12 +57,13 @@ body, html {
   width: 100%;
   height: 100%;
   z-index: 1;
+  background-color: #e2e8f0;
 }
 
 .leaflet-container {
   width: 100%;
   height: 100%;
-  background: #0f172a;
+  background-color: #e2e8f0 !important;
 }
 
 .custom-map-marker-container {

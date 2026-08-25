@@ -111,13 +111,17 @@ let drawnPoints = [];
 let deferredPrompt = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  initMap(); // Initialize Map immediately at 0ms!
   initServiceWorker();
   initNetworkStatus();
   initLanguageSwitcher();
-  await loadData();
-  initMap();
   setupUIEventListeners();
   initPwaInstall();
+  await loadData();
+  if (defaultFarmGeoJSON) {
+    renderFarmOnMap(defaultFarmGeoJSON);
+    renderFarmData(defaultFarmGeoJSON.farm_analysis);
+  }
 });
 
 /* PWA Service Worker Registration */
@@ -225,9 +229,9 @@ async function loadData() {
 }
 
 function initMap() {
-  const farmCentroid = defaultFarmGeoJSON ? 
-    [defaultFarmGeoJSON.farm_analysis.centroid.lat, defaultFarmGeoJSON.farm_analysis.centroid.lon] : 
-    [17.43306, 79.08839];
+  if (map) return;
+
+  const farmCentroid = [17.43306, 79.08839];
 
   map = L.map('map', {
     zoomControl: false,
@@ -249,16 +253,11 @@ function initMap() {
     attribution: '&copy; Esri World Imagery'
   });
 
-  if (defaultFarmGeoJSON) {
-    renderFarmOnMap(defaultFarmGeoJSON);
-    renderFarmData(defaultFarmGeoJSON.farm_analysis);
-  }
-
   map.on('click', handleMapClick);
 
   setTimeout(() => {
-    map.invalidateSize();
-  }, 200);
+    if (map) map.invalidateSize();
+  }, 150);
 
   window.addEventListener('resize', () => {
     if (map) map.invalidateSize();

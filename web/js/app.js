@@ -220,6 +220,8 @@ async function loadData() {
   }
 }
 
+let isSatellite = false;
+
 function initMap() {
   const farmCentroid = defaultFarmGeoJSON ? 
     [defaultFarmGeoJSON.farm_analysis.centroid.lon, defaultFarmGeoJSON.farm_analysis.centroid.lat] : 
@@ -230,28 +232,48 @@ function initMap() {
     style: {
       version: 8,
       sources: {
-        'osm-tiles': {
+        'carto-tiles': {
           type: 'raster',
           tiles: [
-            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+            'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+            'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
+            'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
           ],
           tileSize: 256,
-          attribution: '&copy; OpenStreetMap contributors'
+          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        },
+        'esri-satellite-tiles': {
+          type: 'raster',
+          tiles: [
+            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+          ],
+          tileSize: 256,
+          attribution: '&copy; Esri World Imagery'
         }
       },
       layers: [
         {
-          id: 'osm-layer',
+          id: 'carto-layer',
           type: 'raster',
-          source: 'osm-tiles',
+          source: 'carto-tiles',
           minzoom: 0,
-          maxzoom: 19
+          maxzoom: 20
+        },
+        {
+          id: 'satellite-layer',
+          type: 'raster',
+          source: 'esri-satellite-tiles',
+          minzoom: 0,
+          maxzoom: 20,
+          layout: {
+            'visibility': 'none'
+          }
         }
       ]
     },
     center: farmCentroid,
     zoom: 15.6,
-    pitch: 20
+    pitch: 0
   });
 
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
@@ -266,6 +288,21 @@ function initMap() {
   });
 
   map.on('click', handleMapClick);
+}
+
+function toggleSatelliteView() {
+  if (!map) return;
+  isSatellite = !isSatellite;
+  const btn = document.getElementById('btnToggleSatellite');
+  if (isSatellite) {
+    map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
+    map.setLayoutProperty('carto-layer', 'visibility', 'none');
+    if (btn) btn.classList.add('active');
+  } else {
+    map.setLayoutProperty('satellite-layer', 'visibility', 'none');
+    map.setLayoutProperty('carto-layer', 'visibility', 'visible');
+    if (btn) btn.classList.remove('active');
+  }
 }
 
 function addCatchmentOverlay() {
@@ -426,6 +463,9 @@ function renderFarmData(analysis) {
 }
 
 function setupUIEventListeners() {
+  const satBtn = document.getElementById('btnToggleSatellite');
+  if (satBtn) satBtn.addEventListener('click', toggleSatelliteView);
+
   document.getElementById('btnDropPin').addEventListener('click', () => setToolMode('pin'));
   document.getElementById('btnDrawPolygon').addEventListener('click', () => setToolMode('polygon'));
   document.getElementById('btnResetFarm').addEventListener('click', resetToDefaultFarm);

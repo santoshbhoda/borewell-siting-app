@@ -1,9 +1,9 @@
 /**
- * BSMA GeoAI Borewell Siting App — Service Worker (v3.0.0)
- * Real-time Dynamic Multi-Terrain Physics & Hydrogeological Siting Engine
+ * BSMA GeoAI Borewell Siting App — Service Worker (v4.0.0)
+ * High-performance basemap loading with native browser tile streaming.
  */
 
-const CACHE_NAME = 'borewell-ai-v3.0.0';
+const CACHE_NAME = 'borewell-ai-v4.0.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -22,23 +22,15 @@ const STATIC_ASSETS = [
   './data/Borewell_Siting_Full_Report_MangoFarm.pdf'
 ];
 
-// External CDNs to cache on install
-const EXTERNAL_ASSETS = [
-  'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css',
-  'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
-];
-
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[Service Worker v2] Caching static assets & app shell...');
+      console.log('[Service Worker v4] Pre-caching core app shell...');
       try {
         await cache.addAll(STATIC_ASSETS);
       } catch (err) {
-        console.warn('[Service Worker v2] Local asset caching partial:', err);
+        console.warn('[Service Worker v4] Partial cache on install:', err);
       }
     })
   );
@@ -50,7 +42,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            console.log('[Service Worker v2] Removing old cache:', cache);
+            console.log('[Service Worker v4] Purging old cache:', cache);
             return caches.delete(cache);
           }
         })
@@ -63,8 +55,18 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // 1. Map Tiles & External CDNs: Stale-While-Revalidate with caching
-  if (url.origin.includes('tile.openstreetmap.org') || url.origin.includes('unpkg.com') || url.origin.includes('fonts.') || url.origin.includes('cdnjs.')) {
+  // 1. Direct browser pass-through for Map Tiles & External APIs (prevents opaque tile blocking)
+  if (
+    url.origin.includes('tile.openstreetmap.org') ||
+    url.origin.includes('cartocdn.com') ||
+    url.origin.includes('arcgisonline.com') ||
+    url.origin.includes('open-meteo.com')
+  ) {
+    return; // Native browser fetch
+  }
+
+  // 2. CDNs: Stale-while-revalidate
+  if (url.origin.includes('unpkg.com') || url.origin.includes('fonts.') || url.origin.includes('cdnjs.')) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cachedResponse = await cache.match(request);
@@ -81,7 +83,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. App Shell & Data: Network-First with Cache Fallback (Ensures fresh updates, falls back to cache if offline)
+  // 3. App Shell: Network-First with Cache Fallback
   event.respondWith(
     fetch(request)
       .then((networkResponse) => {
@@ -94,14 +96,9 @@ self.addEventListener('fetch', (event) => {
         return networkResponse;
       })
       .catch(() => {
-        // If network is offline, serve from cache
         return caches.match(request).then((cachedResponse) => {
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          if (request.mode === 'navigate') {
-            return caches.match('./index.html');
-          }
+          if (cachedResponse) return cachedResponse;
+          if (request.mode === 'navigate') return caches.match('./index.html');
         });
       })
   );

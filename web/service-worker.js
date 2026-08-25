@@ -1,14 +1,16 @@
 /**
- * BSMA GeoAI Borewell Siting App — Service Worker (v6.0.0)
- * Bulletproof Leaflet DOM basemap streaming & 100% offline caching.
+ * BSMA GeoAI Borewell Siting App — Service Worker (v7.0.0)
+ * Bulletproof local Leaflet DOM basemap streaming & 100% offline caching.
  */
 
-const CACHE_NAME = 'borewell-ai-v6.0.0';
+const CACHE_NAME = 'borewell-ai-v7.0.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
   './css/styles.css',
   './js/app.js',
+  './vendor/leaflet/leaflet.js',
+  './vendor/leaflet/leaflet.css',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

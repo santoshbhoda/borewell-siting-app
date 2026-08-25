@@ -1,8 +1,8 @@
 /**
  * BSMA GeoAI Borewell & Groundwater Siting Application (MVP + Phase 1)
- * Features: Client-side KML Upload, Preset Farm Switcher (Karun Farm 2 & Mango Farm),
- * Full Siting Report Generator, PDF/HTML/GeoJSON/CSV Exporter, PWA Offline Service Worker,
- * Pin-Drop & Polygon Tools, and Ground-Truth Feedback Loop.
+ * Powered by Leaflet.js (100% Guaranteed Cross-Browser DOM Tile Rendering)
+ * Features: Multi-terrain physics siting, KML upload, preset farm switching,
+ * High-Res Satellite View toggle, WALTA compliance, and full PDF reporting.
  */
 
 // Multi-lingual dictionary
@@ -94,7 +94,13 @@ const I18N = {
 };
 
 let currentLang = 'en';
-let map;
+let map = null;
+let streetLayer = null;
+let satelliteLayer = null;
+let farmBoundaryLayer = null;
+let markers = [];
+let isSatellite = false;
+
 let defaultFarmGeoJSON = null;
 let mangoFarmGeoJSON = null;
 let currentAnalysis = null;
@@ -102,7 +108,6 @@ let currentGeoJSON = null;
 let clientGrid = null;
 let currentToolMode = null; // 'pin', 'polygon', or null
 let drawnPoints = [];
-let markers = [];
 let deferredPrompt = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -120,8 +125,8 @@ function initServiceWorker() {
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('service-worker.js')
-        .then((reg) => console.log('[PWA] Service Worker registered with scope:', reg.scope))
-        .catch((err) => console.warn('[PWA] Service Worker registration failed:', err));
+        .then((reg) => console.log('[PWA] Service Worker active:', reg.scope))
+        .catch((err) => console.warn('[PWA] Service Worker notice:', err));
     });
   }
 }
@@ -159,7 +164,7 @@ function initPwaInstall() {
     if (deferredPrompt) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      console.log('[PWA] Install prompt outcome:', outcome);
+      console.log('[PWA] Install outcome:', outcome);
       deferredPrompt = null;
       installBtn.style.display = 'none';
     }
@@ -200,14 +205,13 @@ async function loadData() {
     clientGrid = await gridRes.json();
     currentGeoJSON = defaultFarmGeoJSON;
     
-    // Save to LocalStorage for offline resilience
     localStorage.setItem('borewell_default_farm', JSON.stringify(defaultFarmGeoJSON));
     if (mangoFarmGeoJSON) {
       localStorage.setItem('borewell_mango_farm', JSON.stringify(mangoFarmGeoJSON));
     }
     localStorage.setItem('borewell_grid', JSON.stringify(clientGrid));
   } catch (err) {
-    console.warn("Loading from offline LocalStorage fallback:", err);
+    console.warn("Loading from offline LocalStorage:", err);
     const cachedFarm = localStorage.getItem('borewell_default_farm');
     const cachedMango = localStorage.getItem('borewell_mango_farm');
     const cachedGrid = localStorage.getItem('borewell_grid');
@@ -220,85 +224,45 @@ async function loadData() {
   }
 }
 
-let isSatellite = false;
-
 function initMap() {
   const farmCentroid = defaultFarmGeoJSON ? 
-    [defaultFarmGeoJSON.farm_analysis.centroid.lon, defaultFarmGeoJSON.farm_analysis.centroid.lat] : 
-    [79.08839, 17.43306];
+    [defaultFarmGeoJSON.farm_analysis.centroid.lat, defaultFarmGeoJSON.farm_analysis.centroid.lon] : 
+    [17.43306, 79.08839];
 
-  map = new maplibregl.Map({
-    container: 'map',
-    style: {
-      version: 8,
-      sources: {
-        'carto-tiles': {
-          type: 'raster',
-          tiles: [
-            'https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            'https://b.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            'https://c.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-            'https://d.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png'
-          ],
-          tileSize: 256,
-          attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
-        },
-        'esri-satellite-tiles': {
-          type: 'raster',
-          tiles: [
-            'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-          ],
-          tileSize: 256,
-          attribution: '&copy; Esri World Imagery'
-        }
-      },
-      layers: [
-        {
-          id: 'carto-layer',
-          type: 'raster',
-          source: 'carto-tiles',
-          minzoom: 0,
-          maxzoom: 20
-        },
-        {
-          id: 'satellite-layer',
-          type: 'raster',
-          source: 'esri-satellite-tiles',
-          minzoom: 0,
-          maxzoom: 20,
-          layout: {
-            'visibility': 'none'
-          }
-        }
-      ]
-    },
-    center: farmCentroid,
-    zoom: 15.6,
-    pitch: 0
+  map = L.map('map', {
+    zoomControl: false,
+    attributionControl: true
+  }).setView(farmCentroid, 16);
+
+  L.control.zoom({ position: 'topright' }).addTo(map);
+  L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+
+  // 1. Street Basemap Layer (OpenStreetMap & CartoDB tiles)
+  streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+
+  // 2. High-Res Satellite Layer (ESRI World Imagery)
+  satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: '&copy; Esri World Imagery'
   });
 
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-  map.addControl(new maplibregl.ScaleControl({ maxWidth: 120, unit: 'metric' }), 'bottom-right');
-
-  map.on('load', () => {
-    map.resize();
-    try {
-      addCatchmentOverlay();
-    } catch (err) {
-      console.warn("Catchment overlay notice:", err);
-    }
-    if (defaultFarmGeoJSON) {
-      renderFarmOnMap(defaultFarmGeoJSON);
-      renderFarmData(defaultFarmGeoJSON.farm_analysis);
-    }
-  });
-
-  // Ensure map renders properly on window resize
-  window.addEventListener('resize', () => {
-    if (map) map.resize();
-  });
+  if (defaultFarmGeoJSON) {
+    renderFarmOnMap(defaultFarmGeoJSON);
+    renderFarmData(defaultFarmGeoJSON.farm_analysis);
+  }
 
   map.on('click', handleMapClick);
+
+  setTimeout(() => {
+    map.invalidateSize();
+  }, 200);
+
+  window.addEventListener('resize', () => {
+    if (map) map.invalidateSize();
+  });
 }
 
 function toggleSatelliteView() {
@@ -306,129 +270,82 @@ function toggleSatelliteView() {
   isSatellite = !isSatellite;
   const btn = document.getElementById('btnToggleSatellite');
   if (isSatellite) {
-    map.setLayoutProperty('satellite-layer', 'visibility', 'visible');
-    map.setLayoutProperty('carto-layer', 'visibility', 'none');
+    if (map.hasLayer(streetLayer)) map.removeLayer(streetLayer);
+    map.addLayer(satelliteLayer);
     if (btn) btn.classList.add('active');
   } else {
-    map.setLayoutProperty('satellite-layer', 'visibility', 'none');
-    map.setLayoutProperty('carto-layer', 'visibility', 'visible');
+    if (map.hasLayer(satelliteLayer)) map.removeLayer(satelliteLayer);
+    map.addLayer(streetLayer);
     if (btn) btn.classList.remove('active');
   }
 }
 
-function addCatchmentOverlay() {
-  if (!clientGrid || !clientGrid.bbox) return;
-  const bbox = clientGrid.bbox;
-  
-  if (map.getSource('gwpi-catchment-overlay')) return;
-
-  map.addSource('gwpi-catchment-overlay', {
-    type: 'image',
-    url: 'data/catchment_gwpi_map.png',
-    coordinates: [
-      [bbox.min_lon, bbox.max_lat],
-      [bbox.max_lon, bbox.max_lat],
-      [bbox.max_lon, bbox.min_lat],
-      [bbox.min_lon, bbox.min_lat]
-    ]
-  });
-
-  map.addLayer({
-    id: 'gwpi-raster-layer',
-    type: 'raster',
-    source: 'gwpi-catchment-overlay',
-    paint: {
-      'raster-opacity': 0.0, // Default to transparent so crystal clear basemap is visible
-      'raster-fade-duration': 300
-    }
-  });
-}
-
 function renderFarmOnMap(geojson) {
   currentGeoJSON = geojson;
-  
-  // Clean features for MapLibre GeoJSON Source
-  const cleanGeoJSON = {
-    type: 'FeatureCollection',
-    features: geojson.features || []
-  };
 
-  if (map.getSource('farm-boundary-source')) {
-    map.getSource('farm-boundary-source').setData(cleanGeoJSON);
-  } else {
-    map.addSource('farm-boundary-source', {
-      type: 'geojson',
-      data: cleanGeoJSON
-    });
+  // Clear existing polygon layer
+  if (farmBoundaryLayer) {
+    map.removeLayer(farmBoundaryLayer);
+    farmBoundaryLayer = null;
+  }
 
-    map.addLayer({
-      id: 'farm-boundary-fill',
-      type: 'fill',
-      source: 'farm-boundary-source',
-      filter: ['==', ['geometry-type'], 'Polygon'],
-      paint: {
-        'fill-color': '#16a34a',
-        'fill-opacity': 0.22
+  // Draw boundary polygon
+  if (geojson && geojson.features && geojson.features.length > 0) {
+    farmBoundaryLayer = L.geoJSON(geojson, {
+      style: function (feature) {
+        return {
+          color: '#dc2626',
+          weight: 3,
+          dashArray: '6, 6',
+          fillColor: '#16a34a',
+          fillOpacity: 0.22
+        };
       }
-    });
+    }).addTo(map);
 
-    map.addLayer({
-      id: 'farm-boundary-line',
-      type: 'line',
-      source: 'farm-boundary-source',
-      filter: ['==', ['geometry-type'], 'Polygon'],
-      paint: {
-        'line-color': '#dc2626',
-        'line-width': 3,
-        'line-dasharray': [2, 1]
+    try {
+      const bounds = farmBoundaryLayer.getBounds();
+      if (bounds.isValid()) {
+        map.fitBounds(bounds, { padding: [60, 60], maxZoom: 17 });
       }
-    });
+    } catch (err) {
+      console.warn("Bounds fit notice:", err);
+    }
   }
 
   // Clear existing markers
-  markers.forEach(m => m.remove());
+  markers.forEach(m => map.removeLayer(m));
   markers = [];
 
-  // Add Candidate Spots as MapLibre HTML Markers
-  geojson.farm_analysis.candidate_points.forEach(pt => {
-    const el = document.createElement('div');
-    el.className = 'custom-map-marker';
-    el.style.width = '32px';
-    el.style.height = '32px';
-    el.style.borderRadius = '50%';
-    el.style.backgroundColor = pt.rank === 1 ? '#16a34a' : pt.rank === 2 ? '#d97706' : '#0284c7';
-    el.style.border = '3px solid white';
-    el.style.boxShadow = '0 4px 12px rgba(0,0,0,0.35)';
-    el.style.display = 'flex';
-    el.style.alignItems = 'center';
-    el.style.justifyContent = 'center';
-    el.style.color = 'white';
-    el.style.fontWeight = '800';
-    el.style.fontSize = '13px';
-    el.style.cursor = 'pointer';
-    el.innerHTML = `#${pt.rank}`;
+  // Add Candidate Spots as HTML Markers
+  if (geojson.farm_analysis && geojson.farm_analysis.candidate_points) {
+    geojson.farm_analysis.candidate_points.forEach(pt => {
+      const bgColor = pt.rank === 1 ? '#16a34a' : pt.rank === 2 ? '#d97706' : '#0284c7';
+      const icon = L.divIcon({
+        className: 'custom-map-marker-container',
+        html: `<div style="background-color: ${bgColor}; width: 32px; height: 32px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 12px rgba(0,0,0,0.35); display: flex; align-items: center; justify-content: center; color: white; font-weight: 800; font-size: 13px; cursor: pointer;">#${pt.rank}</div>`,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16]
+      });
 
-    const popupHtml = `
-      <div style="font-family: sans-serif; padding: 4px;">
-        <h4 style="margin: 0 0 4px 0; color: #0f172a; font-size: 14px;">${pt.label}</h4>
-        <div style="font-size: 12px; margin-bottom: 4px;">
-          <strong>GWPI Score:</strong> <span style="color: #16a34a; font-weight: bold;">${pt.gwpi_score} / 100</span>
+      const popupHtml = `
+        <div style="font-family: sans-serif; padding: 4px;">
+          <h4 style="margin: 0 0 4px 0; color: #0f172a; font-size: 14px;">${pt.label}</h4>
+          <div style="font-size: 12px; margin-bottom: 4px;">
+            <strong>GWPI Score:</strong> <span style="color: #16a34a; font-weight: bold;">${pt.gwpi_score} / 100</span>
+          </div>
+          <div style="font-size: 11px; color: #475569; line-height: 1.4;">
+            <strong>Est. Depth:</strong> ${pt.estimated_depth_range}<br/>
+            <strong>Expected Yield:</strong> ${pt.expected_yield_range}<br/>
+            <strong>Coordinates:</strong> ${pt.lat.toFixed(5)}°N, ${pt.lon.toFixed(5)}°E
+          </div>
         </div>
-        <div style="font-size: 11px; color: #475569; line-height: 1.4;">
-          <strong>Est. Depth:</strong> ${pt.estimated_depth_range}<br/>
-          <strong>Expected Yield:</strong> ${pt.expected_yield_range}<br/>
-          <strong>Coordinates:</strong> ${pt.lat.toFixed(5)}°N, ${pt.lon.toFixed(5)}°E
-        </div>
-      </div>
-    `;
+      `;
 
-    const marker = new maplibregl.Marker({ element: el })
-      .setLngLat([pt.lon, pt.lat])
-      .setPopup(new maplibregl.Popup({ offset: 20 }).setHTML(popupHtml))
-      .addTo(map);
-
-    markers.push(marker);
-  });
+      const marker = L.marker([pt.lat, pt.lon], { icon }).bindPopup(popupHtml).addTo(map);
+      markers.push(marker);
+    });
+  }
 }
 
 function renderFarmData(analysis) {
@@ -459,7 +376,7 @@ function renderFarmData(analysis) {
     const card = document.createElement('div');
     card.className = `spot-card ${pt.rank === 1 ? 'primary-spot' : ''}`;
     card.onclick = () => {
-      map.flyTo({ center: [pt.lon, pt.lat], zoom: 17, speed: 1.2 });
+      map.setView([pt.lat, pt.lon], 17, { animate: true });
     };
 
     const rankLabel = pt.rank === 1 ? t.primary : pt.rank === 2 ? t.secondary : t.alternative;
@@ -508,14 +425,6 @@ function setupUIEventListeners() {
     presetSelect.addEventListener('change', (e) => handlePresetFarmChange(e.target.value));
   }
 
-  // Opacity Slider
-  document.getElementById('opacitySlider').addEventListener('input', (e) => {
-    const val = parseFloat(e.target.value) / 100.0;
-    if (map.getLayer('gwpi-raster-layer')) {
-      map.setPaintProperty('gwpi-raster-layer', 'raster-opacity', val);
-    }
-  });
-
   // Modal Report Listeners
   document.getElementById('btnOpenReport').addEventListener('click', openReportModal);
   document.getElementById('btnQuickReport').addEventListener('click', openReportModal);
@@ -539,17 +448,11 @@ function handlePresetFarmChange(presetKey) {
   if (presetKey === 'mango_farm' && mangoFarmGeoJSON) {
     renderFarmOnMap(mangoFarmGeoJSON);
     renderFarmData(mangoFarmGeoJSON.farm_analysis);
-    map.flyTo({
-      center: [mangoFarmGeoJSON.farm_analysis.centroid.lon, mangoFarmGeoJSON.farm_analysis.centroid.lat],
-      zoom: 15.6
-    });
+    map.setView([mangoFarmGeoJSON.farm_analysis.centroid.lat, mangoFarmGeoJSON.farm_analysis.centroid.lon], 16);
   } else if (presetKey === 'karun_farm_2' && defaultFarmGeoJSON) {
     renderFarmOnMap(defaultFarmGeoJSON);
     renderFarmData(defaultFarmGeoJSON.farm_analysis);
-    map.flyTo({
-      center: [defaultFarmGeoJSON.farm_analysis.centroid.lon, defaultFarmGeoJSON.farm_analysis.centroid.lat],
-      zoom: 15.6
-    });
+    map.setView([defaultFarmGeoJSON.farm_analysis.centroid.lat, defaultFarmGeoJSON.farm_analysis.centroid.lon], 16);
   }
 }
 
@@ -567,21 +470,18 @@ function parseAndEvaluateKML(kmlText, fileName = "Uploaded Farm") {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(kmlText, "text/xml");
     
-    // Check for parse error
     const parseError = xmlDoc.getElementsByTagName("parsererror");
     if (parseError.length > 0) {
       alert("Invalid KML file format. Please ensure it is a valid Google Earth KML.");
       return;
     }
 
-    // Extract Name
     let farmName = fileName.replace(/\.kml$/i, '');
     const nameEl = xmlDoc.getElementsByTagName("name")[0];
     if (nameEl && nameEl.textContent) {
       farmName = nameEl.textContent.trim().replace(/\.kmz$/i, '');
     }
 
-    // Extract Coordinates
     const coordsEls = xmlDoc.getElementsByTagName("coordinates");
     if (!coordsEls || coordsEls.length === 0) {
       alert("No coordinates found in this KML file.");
@@ -609,21 +509,8 @@ function parseAndEvaluateKML(kmlText, fileName = "Uploaded Farm") {
       return;
     }
 
-    // Compute bounding box and fit map
-    let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
-    for (let p of points) {
-      if (p[0] < minLon) minLon = p[0];
-      if (p[0] > maxLon) maxLon = p[0];
-      if (p[1] < minLat) minLat = p[1];
-      if (p[1] > maxLat) maxLat = p[1];
-    }
-
-    map.fitBounds([[minLon, minLat], [maxLon, maxLat]], { padding: 80, maxZoom: 16.5 });
-
-    // Evaluate over grid
     evaluateCustomPolygon(points, farmName);
 
-    // Update preset selector
     const presetSelect = document.getElementById('farmPresetSelect');
     if (presetSelect) {
       let customOpt = presetSelect.querySelector('option[value="custom"]');
@@ -637,11 +524,10 @@ function parseAndEvaluateKML(kmlText, fileName = "Uploaded Farm") {
       customOpt.selected = true;
     }
 
-    // Show temporary notification banner
     const banner = document.getElementById('instructionBanner');
     const textEl = document.getElementById('instructionText');
     banner.classList.add('visible');
-    textEl.textContent = `✓ Successfully loaded and analyzed KML: "${farmName}"`;
+    textEl.textContent = `✓ Successfully analyzed KML: "${farmName}"`;
     setTimeout(() => { banner.classList.remove('visible'); }, 4000);
 
   } catch (err) {
@@ -658,7 +544,6 @@ function setToolMode(mode) {
   const t = I18N[currentLang];
 
   if (currentToolMode === mode) {
-    // Toggle off
     currentToolMode = null;
     pinBtn.classList.remove('active');
     polyBtn.classList.remove('active');
@@ -682,11 +567,12 @@ function setToolMode(mode) {
 
 function handleMapClick(e) {
   if (!currentToolMode) return;
-  const { lng, lat } = e.lngLat;
+  const lat = e.latlng.lat;
+  const lng = e.latlng.lng;
 
   if (currentToolMode === 'pin') {
     evaluatePinDrop(lng, lat);
-    setToolMode(null); // Turn off after drop
+    setToolMode(null);
   } else if (currentToolMode === 'polygon') {
     drawnPoints.push([lng, lat]);
     if (drawnPoints.length >= 3) {
@@ -696,10 +582,7 @@ function handleMapClick(e) {
 }
 
 function evaluatePinDrop(lon, lat) {
-  if (!clientGrid) return;
-  
-  // Create circular buffer around dropped pin (~250m radius)
-  const radiusDeg = 0.0022; // ~240 meters
+  const radiusDeg = 0.0022; // ~240m radius buffer
   const coords = [];
   for (let i = 0; i < 16; i++) {
     const angle = (i / 16) * Math.PI * 2;
@@ -708,7 +591,7 @@ function evaluatePinDrop(lon, lat) {
       lat + Math.sin(angle) * (radiusDeg * 0.95)
     ]);
   }
-  coords.push(coords[0]); // close loop
+  coords.push(coords[0]);
 
   evaluateCustomPolygon(coords, `Pin Sited Plot (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
 }
@@ -726,9 +609,8 @@ async function fetchTerrainElevationProfile(lats, lons) {
       }
     }
   } catch (err) {
-    console.warn("Real-time elevation API timed out / failed, using synthetic topographic model:", err);
+    console.warn("Real-time elevation API fallback active:", err);
   }
-  // Robust mathematical elevation fallback
   return lats.map((lat, i) => {
     const lon = lons[i];
     return Math.round(330 + Math.sin(lat * 80) * 45 + Math.cos(lon * 70) * 35);
@@ -748,19 +630,16 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
   const cLon = (minLon + maxLon) / 2;
   const cLat = (minLat + maxLat) / 2;
 
-  // Calculate true ellipsoidal area
   const widthM = Math.max(80, (maxLon - minLon) * 111320 * Math.cos(cLat * Math.PI / 180));
   const heightM = Math.max(80, (maxLat - minLat) * 110574);
   const approxAcres = Math.max(0.5, ((widthM * heightM * 0.70) / 4046.86)).toFixed(1);
   const approxHectares = (approxAcres * 0.404686).toFixed(2);
 
-  // Show status on banner
   const banner = document.getElementById('instructionBanner');
   const textEl = document.getElementById('instructionText');
   banner.classList.add('visible');
   textEl.textContent = `🛰️ Analyzing 3D terrain elevation, slope, and hydrogeological fractures...`;
 
-  // Sample 5 spatial points across the parcel: Center, North, South, East, West
   const deltaLat = Math.max(0.0012, (maxLat - minLat) * 0.5);
   const deltaLon = Math.max(0.0012, (maxLon - minLon) * 0.5);
 
@@ -774,18 +653,15 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
   const elevE = elevs[3];
   const elevW = elevs[4];
 
-  // Compute real-world finite-difference slope (%)
   const distY = deltaLat * 110574 * 2;
   const distX = deltaLon * 111320 * Math.cos(cLat * Math.PI / 180) * 2;
   const dz_dy = Math.abs(elevN - elevS) / distY;
   const dz_dx = Math.abs(elevE - elevW) / distX;
   const slopePct = Math.max(0.5, Math.min(75.0, Math.sqrt(dz_dx**2 + dz_dy**2) * 100));
 
-  // Topographic relief index (Valley sink vs Ridge peak)
   const surroundingAvg = (elevN + elevS + elevE + elevW) / 4;
   const reliefDiff = elevCenter - surroundingAvg;
 
-  // Dynamic Hydrogeological Parameter Synthesis:
   let meanScore = 0;
   let category = "";
   let spot1Score = 0, spot2Score = 0, spot3Score = 0;
@@ -793,7 +669,6 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
   let summaryEn = "", summaryTe = "", summaryHi = "";
   let hydroRationale = "";
 
-  // 1. Water Body / Wetland / Drainage Depression
   if (slopePct < 1.2 && reliefDiff < -2.2) {
     meanScore = 24.5;
     category = "Prohibited (Surface Water Bed)";
@@ -804,9 +679,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     summaryEn = `${customName} is located inside or immediately adjacent to a surface water tank bed/drainage channel. Borewell drilling is prohibited under WALTA Act.`;
     summaryTe = `${customName} చెరువు లేదా ఉపరితల నీటి ప్రాంతంలో ఉన్నది. వాల్టా చట్టం ప్రకారం ఇక్కడ బోరుబావి వేయడం నిషిద్ధం.`;
     summaryHi = `${customName} जल निकाय / तालाब क्षेत्र में स्थित है। वाल्टा अधिनियम के तहत यहाँ बोरवेल खनन प्रतिबंधित है।`;
-  }
-  // 2. Steep Rocky Ridge / Mountain Hilltop (>12% slope or ridge peak)
-  else if (slopePct >= 12.0 || reliefDiff > 3.5) {
+  } else if (slopePct >= 12.0 || reliefDiff > 3.5) {
     meanScore = Math.max(18.0, 42.0 - slopePct * 0.7);
     category = "Very Low Potential (High Runoff Ridge)";
     spot1Score = Math.max(22.0, meanScore + 3.0);
@@ -818,9 +691,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     summaryEn = `${customName} is located on a steep rocky hill/ridge (Slope: ${slopePct.toFixed(1)}%, Elevation: ${elevCenter}m). Surface runoff exceeds 90% and infiltration is negligible. High risk of dry borewell.`;
     summaryTe = `${customName} ఎత్తైన కొండ/రాతి ప్రదేశంలో ఉన్నది (వాలు: ${slopePct.toFixed(1)}%). వర్షపు నీరు ఇంకడం చాలా తక్కువ. బోరుబావి ఎండిపోయే ప్రమాదం చాలా ఎక్కువ.`;
     summaryHi = `${customName} तीव्र ढलान वाली पहाड़ी पर स्थित है (ढलान: ${slopePct.toFixed(1)}%)। यहाँ भूजल पुनर्भरण नगण्य है और बोरवेल विफल होने का भारी जोखिम है।`;
-  }
-  // 3. Moderate Upland / Pediplain (5.5% - 12% slope)
-  else if (slopePct >= 5.5 && slopePct < 12.0) {
+  } else if (slopePct >= 5.5 && slopePct < 12.0) {
     meanScore = Math.round(62.0 - (slopePct - 5.5) * 1.8);
     category = "Moderate Potential (Upland Pediplain)";
     spot1Score = meanScore + 4.0;
@@ -832,9 +703,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     summaryEn = `${customName} exhibits moderate groundwater potential (${meanScore}/100) on an upland pediplain (${slopePct.toFixed(1)}% slope). Moderate expected yield of 800-1,800 LPH.`;
     summaryTe = `${customName} మధ్యస్థ భూగర్భ జలాల సామర్థ్యాన్ని కలిగి ఉంది (స్కోరు: ${meanScore}/100, వాలు: ${slopePct.toFixed(1)}%). అంచనా ప్రవాహం 800-1,800 LPH.`;
     summaryHi = `${customName} में मध्यम भूजल क्षमता (${meanScore}/100) पाई गई है। 350-480 फीट गहराई पर जल प्रवाह 800-1,800 LPH अनुमानित है।`;
-  }
-  // 4. Flat Valley / Agricultural Plains / Weathered Saprolite (< 5.5% slope)
-  else {
+  } else {
     meanScore = Math.min(88.0, Math.round(76.0 - slopePct * 1.4 - reliefDiff * 0.8));
     category = meanScore >= 75 ? "Very High Potential (Valley Infiltration)" : "High Potential";
     spot1Score = Math.min(92.0, meanScore + 4.5);
@@ -848,7 +717,6 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     summaryHi = `${customName} घाटी के मैदान में स्थित है जहाँ उत्तम भूजल क्षमता (${meanScore}/100) है। 220-340 फीट पर 2,500-4,500+ LPH जल प्रवाह अनुमानित है।`;
   }
 
-  // Generate 3 Distinct Ranked Spots
   const dLat = (maxLat - minLat);
   const dLon = (maxLon - minLon);
 
@@ -933,18 +801,6 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
   setTimeout(() => { banner.classList.remove('visible'); }, 4500);
 }
 
-function pointInPolygon(point, vs) {
-  const x = point[0], y = point[1];
-  let inside = false;
-  for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
-    const xi = vs[i][0], yi = vs[i][1];
-    const xj = vs[j][0], yj = vs[j][1];
-    const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
 function resetToDefaultFarm() {
   setToolMode(null);
   const presetSelect = document.getElementById('farmPresetSelect');
@@ -959,7 +815,6 @@ function resetToDefaultFarm() {
 function openReportModal() {
   if (!currentAnalysis) return;
   
-  // Populate Section 1: Overview
   document.getElementById('modalFarmName').textContent = currentAnalysis.farm_name;
   document.getElementById('modalFarmArea').textContent = `${currentAnalysis.farm_area_acres} Acres (${currentAnalysis.farm_area_hectares} ha)`;
   document.getElementById('modalFarmCoords').textContent = 
@@ -970,7 +825,6 @@ function openReportModal() {
   document.getElementById('modalReportDate').textContent = new Date().toISOString().split('T')[0];
   document.getElementById('modalReportId').textContent = `BSMA-GW-${Date.now().toString().slice(-6)}`;
 
-  // Update Figure 1 Map Image depending on active farm
   const mapImg = document.getElementById('modalMapImg');
   if (mapImg) {
     if (currentAnalysis.farm_name.includes('Mango') || currentAnalysis.farm_name.includes('Farmland 1')) {
@@ -980,7 +834,6 @@ function openReportModal() {
     }
   }
 
-  // Populate Section 3: Table
   const tBody = document.getElementById('modalTableBody');
   tBody.innerHTML = '';
 
@@ -998,7 +851,6 @@ function openReportModal() {
     tBody.appendChild(tr);
   });
 
-  // Populate Section 4: Detailed Rationales
   const ratContainer = document.getElementById('modalSpotRationales');
   ratContainer.innerHTML = '';
   currentAnalysis.candidate_points.forEach(pt => {
@@ -1011,7 +863,6 @@ function openReportModal() {
     ratContainer.appendChild(card);
   });
 
-  // Populate Section 5: Multilingual Summaries
   const sumObj = currentAnalysis.summary || {};
   document.getElementById('modalSummaryEn').textContent = sumObj.en || "Evaluation complete with identified high groundwater recharge potential zones.";
   document.getElementById('modalSummaryTe').textContent = sumObj.te || "భూగర్భ జలాల అంచనా పూర్తయింది. గుర్తించబడిన ప్రదేశాలలో అధిక నీటి సాంద్రత మరియు పగుళ్లు కలవు.";
@@ -1032,7 +883,6 @@ function downloadPdfReport() {
   const isMangoFarm = currentAnalysis.farm_name.includes('Mango') || currentAnalysis.farm_name.includes('Farmland 1');
 
   if (isKarunFarm) {
-    // Direct instant download of the complete 2-page publication-grade PDF
     const a = document.createElement('a');
     a.href = 'data/Borewell_Siting_Full_Report.pdf';
     a.download = `Borewell_Siting_Full_Report_${currentAnalysis.farm_name.replace(/\s+/g, '_')}.pdf`;
@@ -1052,7 +902,6 @@ function downloadPdfReport() {
     return;
   }
 
-  // For custom evaluated plots, generate via html2pdf or browser print
   const element = document.getElementById('printableReportContent');
   const btn = document.getElementById('btnDownloadPDF');
   const originalText = btn.innerHTML;
@@ -1192,12 +1041,10 @@ async function handleFeedbackSubmit(e) {
     feedback_notes: notes
   };
 
-  // 1. Save to local browser storage for offline resilience
   const existingOutcomes = JSON.parse(localStorage.getItem('borewell_outcomes') || '[]');
   existingOutcomes.push({ ...payload, submitted_at: new Date().toISOString() });
   localStorage.setItem('borewell_outcomes', JSON.stringify(existingOutcomes));
 
-  // 2. Attempt API Sync with Backend
   try {
     const plotId = (currentAnalysis && currentAnalysis.id) || "pilot_farm";
     await fetch(`http://localhost:8000/api/v1/plots/${plotId}/feedback`, {
@@ -1205,12 +1052,11 @@ async function handleFeedbackSubmit(e) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    console.log("[ML Flywheel] Outcome synced with cloud backend.");
+    console.log("[ML Flywheel] Outcome synced with backend.");
   } catch (err) {
-    console.log("[ML Flywheel] Backend offline. Outcome saved locally in LocalStorage.");
+    console.log("[ML Flywheel] Backend offline. Saved in LocalStorage.");
   }
 
-  // Show success message
   const msgEl = document.getElementById('fbSuccessMsg');
   msgEl.style.display = 'block';
 

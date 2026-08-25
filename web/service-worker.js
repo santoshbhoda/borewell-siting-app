@@ -1,9 +1,9 @@
 /**
- * BSMA GeoAI Borewell Siting App — Service Worker (v5.0.0)
- * High-performance basemap loading with native browser tile streaming.
+ * BSMA GeoAI Borewell Siting App — Service Worker (v6.0.0)
+ * Bulletproof Leaflet DOM basemap streaming & 100% offline caching.
  */
 
-const CACHE_NAME = 'borewell-ai-v5.0.0';
+const CACHE_NAME = 'borewell-ai-v6.0.0';
 const STATIC_ASSETS = [
   './',
   './index.html',

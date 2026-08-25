@@ -59,6 +59,17 @@ body, html {
   z-index: 1;
 }
 
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #0f172a;
+}
+
+.custom-map-marker-container {
+  background: transparent !important;
+  border: none !important;
+}
+
 /* Top App Header */
 .top-header {
   position: absolute;

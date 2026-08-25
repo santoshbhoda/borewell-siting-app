@@ -238,14 +238,14 @@ function initMap() {
     attributionControl: true
   }).setView(farmCentroid, 16);
 
-  L.control.zoom({ position: 'topright' }).addTo(map);
-  L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 
-  // 1. Street Basemap Layer (OpenStreetMap parallel multi-subdomains)
-  streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    subdomains: ['a', 'b', 'c'],
-    maxZoom: 19,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  // 1. High-Performance Street Basemap Layer (CartoDB Voyager multi-CDN)
+  streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    subdomains: 'abcd',
+    maxZoom: 20,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
   }).addTo(map);
 
   // 2. High-Res Satellite Layer (ESRI World Imagery)
@@ -256,9 +256,10 @@ function initMap() {
 
   map.on('click', handleMapClick);
 
-  setTimeout(() => {
-    if (map) map.invalidateSize();
-  }, 150);
+  // Multiple resize invalidation triggers to guarantee rendering
+  setTimeout(() => { if (map) map.invalidateSize(); }, 100);
+  setTimeout(() => { if (map) map.invalidateSize(); }, 400);
+  setTimeout(() => { if (map) map.invalidateSize(); }, 1000);
 
   window.addEventListener('resize', () => {
     if (map) map.invalidateSize();

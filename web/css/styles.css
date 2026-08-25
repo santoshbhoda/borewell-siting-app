@@ -51,18 +51,20 @@ body, html {
 
 /* Map Canvas */
 #map {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   z-index: 1;
   background-color: #e2e8f0;
 }
 
 .leaflet-container {
-  width: 100%;
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
   background-color: #e2e8f0 !important;
 }
 

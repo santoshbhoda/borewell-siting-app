@@ -1,9 +1,9 @@
 /**
- * BSMA GeoAI Borewell Siting App — Service Worker (v2.0.0)
- * Network-First for App Shell (Instant live updates) + Cache fallback for 100% offline usage.
+ * BSMA GeoAI Borewell Siting App — Service Worker (v3.0.0)
+ * Real-time Dynamic Multi-Terrain Physics & Hydrogeological Siting Engine
  */
 
-const CACHE_NAME = 'borewell-ai-v2.0.0';
+const CACHE_NAME = 'borewell-ai-v3.0.0';
 const STATIC_ASSETS = [
   './',
   './index.html',

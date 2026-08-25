@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BSMA GeoAI — Borewell & Groundwater Siting Application</title>
+  
+  <!-- PWA Metadata & Theme -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0284c7" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/png" href="icons/icon-192.png" />
+
+  <!-- MapLibre GL JS CSS & JS -->
+  <link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet" />
+  <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+
+  <!-- html2pdf.js for client-side PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <!-- Google Fonts: Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- App Stylesheet -->
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div id="app-container">
+    
+    <!-- Top Header Bar -->
+    <header class="top-header">
+      <div class="brand-badge">
+        <div class="brand-logo">🌊</div>
+        <div class="brand-info">
+          <h1 data-i18n="appTitle">Borewell Siting AI</h1>
+          <p data-i18n="subTitle">GeoAI Groundwater Prospecting (Musi Basin)</p>
+        </div>
+      </div>
+
+      <div class="header-controls">
+        <div id="networkStatus" class="network-badge">
+          <span style="width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block;"></span>
+          <span id="networkText">Online</span>
+        </div>
+        <select id="langSelect" class="lang-dropdown">
+          <option value="en" selected>English</option>
+          <option value="te">తెలుగు (Telugu)</option>
+          <option value="hi">हिन्दी (Hindi)</option>
+        </select>
+        <button id="btnOpenReport" class="btn-header btn-highlight" title="Download & View Full Report">
+          📥 <span data-i18n="fullReportBtn">Full Siting Report</span>
+        </button>
+        <button id="btnOpenFeedback" class="btn-header" style="background: #16a34a; color: white; border-color: #16a34a;" title="Submit Actual Drilling Outcome for ML Retraining">
+          📝 <span data-i18n="addOutcome">Record Outcome</span>
+        </button>
+        <button id="btnInstallPwa" class="btn-header" style="display: none; background: #0284c7; color: white;" title="Install App on Phone">📲 Install</button>
+      </div>
+    </header>
+
+    <!-- Floating Map Action Tools -->
+    <div class="map-tools-bar">
+      <!-- Pin Drop Tool -->
+      <button id="btnDropPin" class="tool-btn" title="Drop Pin to Site Borewells">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+          <circle cx="12" cy="10" r="3"></circle>
+        </svg>
+      </button>
+
+      <!-- Polygon Draw Tool -->
+      <button id="btnDrawPolygon" class="tool-btn" title="Draw Custom Boundary">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/>
+        </svg>
+      </button>
+
+      <!-- Reset Tool -->
+      <button id="btnResetFarm" class="tool-btn" title="Reset to Karun Farm 2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Map Canvas -->
+    <div id="map"></div>
+
+    <!-- Map Legend & Layer Controls -->
+    <div class="map-legend">
+      <div style="font-weight: 700; color: #0f172a;" data-i18n="legendTitle">Groundwater Potential Index</div>
+      <div class="legend-bar"></div>
+      <div class="legend-labels">
+        <span data-i18n="poor">Low (0)</span>
+        <span>50</span>
+        <span data-i18n="high">High (100)</span>
+      </div>
+      <div class="layer-toggle-row">
+        <span style="font-size: 10px; color: var(--text-muted);">Heatmap Opacity</span>
+        <input type="range" id="opacitySlider" min="0" max="100" value="65" style="width: 70px; cursor: pointer;" />
+      </div>
+    </div>
+
+    <!-- Siting Results Side Panel / Drawer -->
+    <aside class="results-drawer">
+      <div class="drawer-header">
+        <div>
+          <h2 id="farmNameDisplay">Karun Farm 2</h2>
+          <span id="regionSubText" style="font-size: 11px; color: var(--text-muted);">Yadadri-Bhuvanagiri / Musi Basin</span>
+        </div>
+        <span id="farmCategoryDisplay" class="status-tag status-high">High Potential</span>
+      </div>
+
+      <div class="drawer-body">
+        <!-- Interactive Instruction Banner -->
+        <div id="instructionBanner" class="instruction-banner">
+          <span id="instructionText">Click anywhere on the map to evaluate and site candidate borewells.</span>
+        </div>
+
+        <!-- Metric Grid -->
+        <div class="metric-grid">
+          <div class="metric-card">
+            <div class="label" data-i18n="meanPotential">Mean Potential</div>
+            <div id="meanScoreVal" class="value">66.5 / 100</div>
+          </div>
+          <div class="metric-card">
+            <div class="label" data-i18n="landArea">Land Area</div>
+            <div id="areaVal" class="value">14.8 Acres</div>
+          </div>
+          <div class="metric-card">
+            <div class="label" data-i18n="elevationRange">Elevation</div>
+            <div id="elevVal" class="value">~336 m</div>
+          </div>
+          <div class="metric-card">
+            <div class="label">Lithology</div>
+            <div class="value" style="font-size: 13px;">Weathered Gneiss</div>
+          </div>
+        </div>
+
+        <!-- Plain Language Summary -->
+        <div class="summary-card">
+          <p id="summaryText">
+            Karun Farm 2 shows an overall High Potential. The most favorable groundwater recharge and secondary fracture intersections are concentrated along the central and lower drainage contours.
+          </p>
+        </div>
+
+        <!-- Candidate Spots Section -->
+        <div class="candidate-section">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <h3 style="margin: 0;" data-i18n="topSpots">Top Recommended Spots</h3>
+            <button id="btnQuickReport" style="font-size: 11px; padding: 4px 8px; border-radius: 6px; background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; cursor: pointer; font-weight: 600;">
+              📥 Full Report
+            </button>
+          </div>
+          <div id="candidateSpotsList" class="candidate-list">
+            <!-- Candidate cards injected by JavaScript -->
+          </div>
+        </div>
+
+        <!-- WALTA Advisory -->
+        <div class="advisory-box">
+          <strong data-i18n="waltaStatus">WALTA Compliance Notice</strong>
+          <span data-i18n="waltaText">Minimum 150m spacing between agricultural borewells required in Telangana hard-rock.</span>
+        </div>
+
+        <!-- Mandatory VES Survey Notice -->
+        <div class="advisory-box" style="background: #f0fdf4; border-color: #bbf7d0; color: #166534;">
+          <strong data-i18n="vesNoticeTitle">Mandatory VES Field Verification</strong>
+          <span data-i18n="vesNoticeText">Before drilling rig mobilization, conduct a 1D/2D Vertical Electrical Sounding (VES) resistivity survey at Spot #1 to verify deep fracture depth.</span>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <!-- Full Siting Report Modal -->
+  <div id="reportModal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; color: white;">BSMA GeoAI — Complete Borewell Siting & Hydrogeological Report</h3>
+          <p style="margin: 3px 0 0 0; font-size: 11px; opacity: 0.8; color: #cbd5e1;">Official Hydrogeological Siting Document & Drilling Rig Operator Protocol</p>
+        </div>
+        <button id="btnCloseModal" class="btn-close" title="Close">✕</button>
+      </div>
+
+      <!-- Printable & PDF Export Container -->
+      <div class="modal-body">
+        <div id="printableReportContent" class="report-document-sheet">
+          
+          <!-- Document Header -->
+          <div class="report-header-banner">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="font-size: 28px; background: #0284c7; color: white; width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 800;">🌊</div>
+              <div>
+                <h1 style="margin: 0; font-size: 19px; font-weight: 800; color: #0f172a;">BSMA GeoAI Groundwater Siting Report</h1>
+                <p style="margin: 2px 0 0 0; font-size: 11px; color: #64748b;">Deccan Peninsular Gneissic Terrain | Musi Sub-Basin, Telangana</p>
+              </div>
+            </div>
+            <div style="text-align: right;">
+              <div style="font-size: 11px; color: #64748b; font-weight: 600;">Report ID: <span id="modalReportId">BSMA-GW-2026-KF02</span></div>
+              <div style="font-size: 11px; color: #64748b;">Generated: <span id="modalReportDate">2026-08-25</span></div>
+            </div>
+          </div>
+
+          <!-- Section 1: Plot Overview -->
+          <div class="report-section">
+            <h3 class="section-title">1. Land Parcel & Hydrogeological Profile</h3>
+            <div class="overview-box">
+              <div class="overview-item">
+                <span class="lbl">Land Parcel Name</span>
+                <span class="val" id="modalFarmName">Karun Farm 2</span>
+              </div>
+              <div class="overview-item">
+                <span class="lbl">Total Area</span>
+                <span class="val" id="modalFarmArea">14.81 Acres (5.993 ha)</span>
+              </div>
+              <div class="overview-item">
+                <span class="lbl">Parcel Centroid</span>
+                <span class="val" id="modalFarmCoords">17.43306°N, 79.08839°E</span>
+              </div>
+              <div class="overview-item">
+                <span class="lbl">Overall Potential Index</span>
+                <span class="val highlight" id="modalScoreBadge">66.5 / 100 (High Potential)</span>
+              </div>
+              <div class="overview-item">
+                <span class="lbl">Terrain & Lithology</span>
+                <span class="val">Weathered Granite-Gneiss Saprolite</span>
+              </div>
+              <div class="overview-item">
+                <span class="lbl">Rainfall Recharge Zone</span>
+                <span class="val">~820 mm/yr (South-West Monsoon)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 2: Farm Siting Plan Map -->
+          <div class="report-section">
+            <h3 class="section-title">2. Farm Siting Plan & Candidate Locations Map</h3>
+            <div class="report-map-container">
+              <img id="modalMapImg" src="data/farm_siting_plan.png" alt="Farm Siting Map" class="report-map-img" />
+              <div style="font-size: 10px; color: #64748b; margin-top: 4px; text-align: center;">
+                Figure 1: High-resolution plot boundary with color-coded candidate drilling spots (#1 Primary, #2 Secondary, #3 Alternative) and GWPI heatmap.
+              </div>
+            </div>
+          </div>
+
+          <!-- Section 3: Ranked Drilling Locations Table -->
+          <div class="report-section">
+            <h3 class="section-title">3. Ranked Candidate Drilling Spots & Technical Specifications</h3>
+            <table class="report-table">
+              <thead>
+                <tr>
+                  <th style="width: 14%;">Rank & Priority</th>
+                  <th style="width: 22%;">Coordinates (Lat, Lon)</th>
+                  <th style="width: 12%;">GWPI Score</th>
+                  <th style="width: 16%;">Est. Drilling Depth</th>
+                  <th style="width: 18%;">Expected Water Yield</th>
+                  <th style="width: 18%;">Terrain / Slope</th>
+                </tr>
+              </thead>
+              <tbody id="modalTableBody">
+                <!-- Injected by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Section 4: Detailed Geological Rationale -->
+          <div class="report-section">
+            <h3 class="section-title">4. Geological & Morphometric Recommendations</h3>
+            <div id="modalSpotRationales" class="rationales-container">
+              <!-- Injected by JavaScript -->
+            </div>
+          </div>
+
+          <!-- Section 5: Plain Language Multilingual Summary -->
+          <div class="report-section">
+            <h3 class="section-title">5. Plain-Language Guidance for Landowner / Farmer</h3>
+            <div class="lang-summary-card">
+              <div style="font-weight: 700; margin-bottom: 4px; color: #0369a1;">English Summary:</div>
+              <p id="modalSummaryEn" style="margin: 0 0 10px 0; font-size: 11.5px; line-height: 1.5;"></p>
+              
+              <div style="font-weight: 700; margin-bottom: 4px; color: #0369a1;">తెలుగు సారాంశం (Telugu Guidance):</div>
+              <p id="modalSummaryTe" style="margin: 0 0 10px 0; font-size: 11.5px; line-height: 1.5; color: #1e293b;"></p>
+
+              <div style="font-weight: 700; margin-bottom: 4px; color: #0369a1;">हिन्दी सारांश (Hindi Guidance):</div>
+              <p id="modalSummaryHi" style="margin: 0; font-size: 11.5px; line-height: 1.5; color: #1e293b;"></p>
+            </div>
+          </div>
+
+          <!-- Section 6: AHP Weights Matrix -->
+          <div class="report-section">
+            <h3 class="section-title">6. AHP Multi-Criteria Layer Evaluation Breakdown</h3>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; font-size: 11px;">
+              <div class="ahp-mini-card"><strong>Geology & Lithology:</strong> 25.72%</div>
+              <div class="ahp-mini-card"><strong>Fracture Lineaments:</strong> 20.87%</div>
+              <div class="ahp-mini-card"><strong>Topographic Slope:</strong> 15.75%</div>
+              <div class="ahp-mini-card"><strong>Drainage Density:</strong> 12.01%</div>
+              <div class="ahp-mini-card"><strong>Wetness Index (TWI):</strong> 9.12%</div>
+              <div class="ahp-mini-card"><strong>Land Use / LULC:</strong> 6.96%</div>
+              <div class="ahp-mini-card"><strong>Soil Infiltration:</strong> 5.38%</div>
+              <div class="ahp-mini-card"><strong>Rainfall Recharge:</strong> 4.19%</div>
+            </div>
+          </div>
+
+          <!-- Section 7: Verification Checklist & WALTA Compliance -->
+          <div class="report-section" style="page-break-inside: avoid;">
+            <h3 class="section-title">7. Statutory Clearance & Drilling Rig Operator Checklist</h3>
+            <div class="checklist-box">
+              <div style="margin-bottom: 8px;">
+                <strong style="color: #15803d;">✓ Telangana WALTA Act Compliance:</strong>
+                All recommended candidate spots are spaced \(\ge 150\text{ meters}\) apart to avoid cone-of-depression interference. Confirm 150m clearance from neighboring agricultural wells.
+              </div>
+              <div style="margin-bottom: 8px;">
+                <strong style="color: #0369a1;">⚡ Mandatory Pre-Drilling VES Resistivity Survey:</strong>
+                This GeoAI analysis identifies probabilistic structural fracture corridors. Vertical Electrical Sounding (VES) or 2D Electrical Resistivity Imaging (ERI) must be conducted at Spot #1 to pinpoint the exact depth of the water-bearing fracture before rig mobilization.
+              </div>
+              <div>
+                <strong style="color: #b45309;">🛠️ Drilling Rig Technical Specifications:</strong>
+                • Minimum 40–60 ft MS/PVC casing through topsoil/saprolite until hard bedrock is seated.<br/>
+                • Recommended 6.5-inch DTH hammer drill bit with high-pressure compressor (900–1100 CFM / 300 PSI).<br/>
+                • Gravel packing recommended in weathered granite zones.
+              </div>
+            </div>
+          </div>
+
+          <!-- Sign-off Footer -->
+          <div class="report-signoff">
+            <div>
+              <p style="margin: 0; font-weight: 700;">BSMA Enterprises — Applied GeoAI Division</p>
+              <p style="margin: 2px 0 0 0; font-size: 10px; color: #64748b;">Scientific Groundwater Prospecting & Hydrogeological Siting</p>
+            </div>
+            <div style="text-align: right;">
+              <div style="border-top: 1px solid #94a3b8; width: 160px; margin-left: auto; padding-top: 4px; font-size: 10px; color: #475569;">
+                Hydrogeological Verification Stamp
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Modal Action Buttons -->
+      <div class="modal-footer">
+        <button id="btnDownloadGeoJSON" class="btn-secondary" title="Download GIS GeoJSON dataset">🌐 Download GeoJSON</button>
+        <button id="btnDownloadCSV" class="btn-secondary" title="Download Coordinates CSV table">📊 Download CSV</button>
+        <button id="btnDownloadHTML" class="btn-secondary" title="Download Standalone HTML Report">📑 Download HTML</button>
+        <button id="btnDownloadPDF" class="btn-primary" title="Download Official PDF Report">📥 Download Full PDF Report</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Drilling Outcome Feedback Modal (ML Data Flywheel) -->
+  <div id="feedbackModal" class="modal-backdrop">
+    <div class="modal-card" style="max-width: 580px; height: auto; max-height: 90vh;">
+      <div class="modal-header" style="background: #166534;">
+        <div>
+          <h3 style="margin: 0; font-size: 16px; color: white;">📝 Record Drilling Outcome</h3>
+          <p style="margin: 3px 0 0 0; font-size: 11px; opacity: 0.85; color: #bbf7d0;">Ground-Truth Outcome Feedback for GeoAI Model Retraining</p>
+        </div>
+        <button id="btnCloseFeedbackModal" class="btn-close" title="Close">✕</button>
+      </div>
+
+      <form id="feedbackForm" class="modal-body" style="background: white; padding: 20px; display: flex; flex-direction: column; gap: 14px;">
+        <div style="font-size: 12px; color: #475569; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 6px;">
+          Recording actual well depth and discharge yield trains the machine learning models to improve prediction accuracy across your mandal.
+        </div>
+
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 4px;">Target Sited Spot</label>
+          <select id="fbTargetSpot" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+            <option value="spot_1" selected>Spot #1 Primary (17.43388°N, 79.08853°E)</option>
+            <option value="spot_2">Spot #2 Secondary (17.43443°N, 79.08684°E)</option>
+            <option value="spot_3">Spot #3 Alternative (17.43252°N, 79.08882°E)</option>
+            <option value="other">Other Point on Plot</option>
+          </select>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 4px;">Total Drilled Depth (ft) *</label>
+            <input type="number" id="fbDrilledDepth" required min="50" max="1500" value="340" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;" />
+          </div>
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 4px;">Water Strike Depth (ft)</label>
+            <input type="number" id="fbStrikeDepth" min="20" max="1500" value="295" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;" />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 4px;">Casing Pipe Depth (ft)</label>
+            <input type="number" id="fbCasingDepth" min="10" max="200" value="55" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;" />
+          </div>
+          <div>
+            <label style="font-size: 11.5px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 4px;">Discharge Yield *</label>
+            <select id="fbYieldCategory" required style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">
+              <option value="High (>2 inch)">High (>2.0 inch / 3,000+ LPH)</option>
+              <option value="Moderate (1-2 inch)" selected>Moderate (1.0–2.0 inch / 1,500–3,000 LPH)</option>
+              <option value="Low (<1 inch)">Low (<1.0 inch / 500–1,500 LPH)</option>
+              <option value="Dry">Dry (No water struck)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 2px;">
+          <input type="checkbox" id="fbVesCheck" checked style="width: 16px; height: 16px; cursor: pointer;" />
+          <label for="fbVesCheck" style="font-size: 12px; color: #1e293b; cursor: pointer;">
+            Vertical Electrical Sounding (VES) resistivity test was conducted before drilling
+          </label>
+        </div>
+
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 4px;">Drilling Rig Contractor</label>
+          <input type="text" id="fbContractor" value="Sri Balaji Borewells (Bhuvanagiri)" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;" />
+        </div>
+
+        <div>
+          <label style="font-size: 11.5px; font-weight: 700; color: #0f172a; display: block; margin-bottom: 4px;">Field Observations & Notes</label>
+          <textarea id="fbNotes" rows="2" style="width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px;">Drilled with 6.5" DTH hammer. Good fracture encountered at 295 ft depth with steady discharge.</textarea>
+        </div>
+
+        <div id="fbSuccessMsg" style="display: none; background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; padding: 10px; border-radius: 6px; font-size: 12px; font-weight: 600;">
+          ✓ Drilling outcome successfully recorded and synced with Phase 1 Cloud Database!
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+          <button type="button" id="btnCancelFeedback" class="btn-secondary">Cancel</button>
+          <button type="submit" id="btnSubmitFeedback" class="btn-primary" style="background: #16a34a;">
+            ✓ Submit Outcome Data
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Scripts -->
+  <script src="js/app.js"></script>
+</body>
+</html>

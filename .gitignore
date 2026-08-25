@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local Database & Environment Files
+*.db
+borewell_local.db
+.env
+.env.local
+
+# Virtual Environments
+venv/
+.venv/
+env/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Output temporary test PDFs
+data/output/report_*.pdf

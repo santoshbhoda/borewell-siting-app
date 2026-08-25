@@ -1,0 +1,17 @@
+# Render 1-Click Deployment Specification
+# Deploys FastAPI Backend + Connects to Supabase / Neon PostGIS
+services:
+  - type: web
+    name: bsma-borewell-api
+    env: python
+    region: singapore # Closest low-latency region to India
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+      - key: DATABASE_URL
+        sync: false # Set in Render Dashboard to your Supabase/Neon connection string
+      - key: DEBUG
+        value: "False"

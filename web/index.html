@@ -45,6 +45,11 @@
           <span style="width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block;"></span>
           <span id="networkText">Online</span>
         </div>
+        <select id="farmPresetSelect" class="lang-dropdown" title="Select Preloaded Farm or Custom KML">
+          <option value="karun_farm_2" selected>Karun Farm 2 (14.8 Ac)</option>
+          <option value="mango_farm">Mango Farm (20.4 Ac)</option>
+          <option value="custom" disabled>Custom Uploaded KML</option>
+        </select>
         <select id="langSelect" class="lang-dropdown">
           <option value="en" selected>English</option>
           <option value="te">తెలుగు (Telugu)</option>
@@ -62,6 +67,16 @@
 
     <!-- Floating Map Action Tools -->
     <div class="map-tools-bar">
+      <!-- Upload KML Tool -->
+      <button id="btnUploadKML" class="tool-btn" title="Upload Custom KML File">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </button>
+      <input type="file" id="kmlFileInput" accept=".kml,.xml" style="display: none;" />
+
       <!-- Pin Drop Tool -->
       <button id="btnDropPin" class="tool-btn" title="Drop Pin to Site Borewells">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -78,7 +93,7 @@
       </button>
 
       <!-- Reset Tool -->
-      <button id="btnResetFarm" class="tool-btn" title="Reset to Karun Farm 2">
+      <button id="btnResetFarm" class="tool-btn" title="Reset Farm">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
           <path d="M3 3v5h5"/>

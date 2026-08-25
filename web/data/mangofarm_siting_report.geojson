@@ -1,0 +1,227 @@
+{
+  "type": "FeatureCollection",
+  "metadata": {
+    "application": "BSMA GeoAI Borewell & Groundwater Siting Engine",
+    "pilot_region": "Yadadri-Bhuvanagiri / Jangaon Belt, Musi Basin, Telangana",
+    "hydrogeology": "Hard-Rock Peninsular Gneissic Terrain",
+    "model": "Saaty AHP Multi-Criteria Decision Analysis",
+    "ahp_weights": {
+      "geology": 0.2572,
+      "lineament_density": 0.2087,
+      "slope": 0.1575,
+      "drainage_density": 0.1201,
+      "twi": 0.0912,
+      "lulc": 0.0696,
+      "soil": 0.0538,
+      "rainfall": 0.0419
+    },
+    "ahp_consistency_ratio": 0.0068
+  },
+  "farm_analysis": {
+    "farm_name": "Mango Farm (Karun Farmland 1)",
+    "farm_area_acres": 20.37,
+    "farm_area_hectares": 8.242,
+    "bounds": {
+      "min_lon": 79.07982793846479,
+      "min_lat": 17.43374814249506,
+      "max_lon": 79.08390052922951,
+      "max_lat": 17.43616691188675
+    },
+    "centroid": {
+      "lon": 79.08173006014678,
+      "lat": 17.434884939002067
+    },
+    "score_statistics": {
+      "min": 61.9,
+      "max": 70.4,
+      "mean": 65.9,
+      "category": "High Potential"
+    },
+    "candidate_points": [
+      {
+        "rank": 1,
+        "label": "Spot #1 (Primary)",
+        "lat": 17.435776,
+        "lon": 79.082285,
+        "gwpi_score": 70.4,
+        "potential_category": "Moderate to High Potential",
+        "elevation_m": 336.3,
+        "slope_pct": 2.5,
+        "lineament_density_index": 9.5,
+        "twi_index": 9.4,
+        "estimated_depth_range": "280 - 400 ft",
+        "expected_yield_range": "1,500 - 2,500 LPH (approx 1.0 - 1.5 inch yield)",
+        "hydro_summary": "Located on a gentle slope (2.5%) with favorable fracture density and high moisture convergence in the weathered granite zone."
+      },
+      {
+        "rank": 2,
+        "label": "Spot #2 (Secondary)",
+        "lat": 17.434416,
+        "lon": 79.082852,
+        "gwpi_score": 70.4,
+        "potential_category": "Moderate to High Potential",
+        "elevation_m": 332.3,
+        "slope_pct": 2.4,
+        "lineament_density_index": 9.3,
+        "twi_index": 9.2,
+        "estimated_depth_range": "280 - 400 ft",
+        "expected_yield_range": "1,500 - 2,500 LPH (approx 1.0 - 1.5 inch yield)",
+        "hydro_summary": "Located on a gentle slope (2.4%) with favorable fracture density and high moisture convergence in the weathered granite zone."
+      },
+      {
+        "rank": 3,
+        "label": "Spot #3 (Alternative)",
+        "lat": 17.434688,
+        "lon": 79.080018,
+        "gwpi_score": 70.2,
+        "potential_category": "Moderate to High Potential",
+        "elevation_m": 331.8,
+        "slope_pct": 4.3,
+        "lineament_density_index": 20.5,
+        "twi_index": 8.1,
+        "estimated_depth_range": "280 - 400 ft",
+        "expected_yield_range": "1,500 - 2,500 LPH (approx 1.0 - 1.5 inch yield)",
+        "hydro_summary": "Located on a gentle slope (4.3%) with favorable fracture density and high moisture convergence in the weathered granite zone."
+      }
+    ],
+    "summary": {
+      "en": "Karun Farm 2 (20.37 Acres) shows an overall High Potential (Average Potential Index: 65.9/100). The most favorable groundwater recharge and secondary fracture intersections are concentrated along the central and lower drainage contours. Top recommendation is Spot #1 at coordinates (17.435776, 79.082285) with a score of 70.4/100.",
+      "te": "కరుణ్ ఫామ్ 2 (20.37 ఎకరాలు) సగటున 65.9/100 అనుకూలమైన భూగర్భ జలాల సామర్థ్యాన్ని కలిగి ఉంది. పగుళ్లు మరియు నీటి నిల్వ ఉండే ఉపరితల నేలలు ప్రధానంగా గుర్తించబడ్డాయి. మొదటి ప్రాధాన్యతా స్థానం (స్పాట్ #1) వద్ద అత్యధిక నీటి సాంద్రత (70.4/100) నమోదైంది. డ్రిల్లింగ్ చేయడానికి ముందు VES రెసిస్టివిటీ సర్వే చేయించుకోవడం తప్పనిసరి.",
+      "hi": "करुण फार्म 2 (20.37 एकड़) में भूजल क्षमता का औसत सूचकांक 65.9/100 है। खेत के मध्य और निचले हिस्से में चट्टानी दरारों (Lineaments) और जल संचयन की स्थिति अनुकूल है। सबसे उत्तम स्थान स्पॉट #1 (70.4/100) पर पहचाना गया है। बोरवेल खुदाई से पहले VES भू-भौतिकीय सर्वेक्षण अवश्य करवाएं।"
+    },
+    "advisory": {
+      "walta_compliance": {
+        "status": "Applicable (Telangana WALTA Act)",
+        "rule": "Minimum distance between two commercial/agricultural borewells must be 150 meters.",
+        "clearance_needed": false,
+        "message": "The proposed spots are located on private agricultural land. Ensure 150m clearance from neighboring active wells."
+      },
+      "ves_verification_note": {
+        "title": "Mandatory Pre-Drilling Field Verification (VES Survey)",
+        "guidance": "GIS/Remote Sensing identifies high-probability fracture corridors and weathering zones. Before investing in rig mobilization, conduct a 1D/2D Vertical Electrical Sounding (VES) or Resistivity Imaging survey at the marked coordinates to confirm the exact depth of the water-bearing fracture."
+      }
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "Farm Boundary",
+        "name": "Mango Farm (Karun Farmland 1)",
+        "area_acres": 20.37,
+        "area_hectares": 8.242,
+        "mean_gwpi_score": 65.9,
+        "category": "High Potential"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              79.08138045934864,
+              17.43380218147114
+            ],
+            [
+              79.08290431044692,
+              17.43374814249506
+            ],
+            [
+              79.08390052922951,
+              17.4353923331588
+            ],
+            [
+              79.08356438847619,
+              17.43553046224146
+            ],
+            [
+              79.08326236119024,
+              17.43569065046504
+            ],
+            [
+              79.08248296408615,
+              17.435799436976
+            ],
+            [
+              79.08037491533382,
+              17.43616691188675
+            ],
+            [
+              79.07982793846479,
+              17.43404147168228
+            ],
+            [
+              79.08138045934864,
+              17.43380218147114
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "Borewell Candidate Spot",
+        "rank": 1,
+        "label": "Spot #1 (Primary)",
+        "gwpi_score": 70.4,
+        "potential_category": "Moderate to High Potential",
+        "elevation_m": 336.3,
+        "slope_pct": 2.5,
+        "estimated_depth_range": "280 - 400 ft",
+        "expected_yield_range": "1,500 - 2,500 LPH (approx 1.0 - 1.5 inch yield)",
+        "hydro_summary": "Located on a gentle slope (2.5%) with favorable fracture density and high moisture convergence in the weathered granite zone."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          79.082285,
+          17.435776
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "Borewell Candidate Spot",
+        "rank": 2,
+        "label": "Spot #2 (Secondary)",
+        "gwpi_score": 70.4,
+        "potential_category": "Moderate to High Potential",
+        "elevation_m": 332.3,
+        "slope_pct": 2.4,
+        "estimated_depth_range": "280 - 400 ft",
+        "expected_yield_range": "1,500 - 2,500 LPH (approx 1.0 - 1.5 inch yield)",
+        "hydro_summary": "Located on a gentle slope (2.4%) with favorable fracture density and high moisture convergence in the weathered granite zone."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          79.082852,
+          17.434416
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "feature_type": "Borewell Candidate Spot",
+        "rank": 3,
+        "label": "Spot #3 (Alternative)",
+        "gwpi_score": 70.2,
+        "potential_category": "Moderate to High Potential",
+        "elevation_m": 331.8,
+        "slope_pct": 4.3,
+        "estimated_depth_range": "280 - 400 ft",
+        "expected_yield_range": "1,500 - 2,500 LPH (approx 1.0 - 1.5 inch yield)",
+        "hydro_summary": "Located on a gentle slope (4.3%) with favorable fracture density and high moisture convergence in the weathered granite zone."
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          79.080018,
+          17.434688
+        ]
+      }
+    }
+  ]
+}

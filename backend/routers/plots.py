@@ -4,7 +4,7 @@ Plots Router: Spatial Evaluation, Siting & PDF Report Streaming
 import os
 import math
 from typing import List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from shapely.geometry import Polygon, Point
@@ -248,6 +248,108 @@ def get_plot(plot_id: str, db: Session = Depends(get_db)):
         ],
         created_at=db_plot.created_at
     )
+
+
+@router.post("/upload-kml", response_model=PlotResponse, status_code=status.HTTP_201_CREATED)
+async def upload_and_evaluate_kml(
+    file: UploadFile = File(..., description="Google Earth KML file"),
+    db: Session = Depends(get_db)
+):
+    """
+    Uploads a KML file, extracts polygon boundary coordinates, runs spatial evaluation,
+    persists the plot and candidate spots to PostGIS, and returns full siting results.
+    """
+    if not file.filename.lower().endswith(('.kml', '.xml')):
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a .kml file.")
+
+    content = await file.read()
+    
+    # Save temporary KML to parse
+    temp_kml_path = os.path.join(ROOT_DIR, "data", "output", f"temp_{file.filename}")
+    with open(temp_kml_path, "wb") as f:
+        f.write(content)
+
+    try:
+        from pipeline.kml_parser import parse_kml
+        farm_info = parse_kml(temp_kml_path)
+        
+        # Extract coordinates array
+        coords = list(farm_info["polygon"].exterior.coords)
+        coords_list = [[float(c[0]), float(c[1])] for c in coords]
+        
+        eval_result = evaluate_polygon_grid(coords_list)
+        farm_name = farm_info.get("name") or file.filename.rsplit('.', 1)[0]
+
+        db_plot = LandPlot(
+            plot_name=farm_name,
+            state="Telangana",
+            district="Yadadri-Bhuvanagiri",
+            mandal="Bhuvanagiri",
+            village="Rayagiri",
+            area_acres=eval_result["area_acres"],
+            area_hectares=eval_result["area_hectares"],
+            centroid_lat=eval_result["centroid"]["lat"],
+            centroid_lon=eval_result["centroid"]["lon"],
+            boundary_geojson=eval_result["boundary_geojson"],
+            mean_gwpi_score=eval_result["mean_gwpi_score"],
+            potential_category=eval_result["potential_category"]
+        )
+        db.add(db_plot)
+        db.flush()
+
+        for s in eval_result["candidate_spots"]:
+            db_spot = CandidateSpot(
+                plot_id=db_plot.id,
+                rank=s["rank"],
+                label=s["label"],
+                lat=s["lat"],
+                lon=s["lon"],
+                gwpi_score=s["gwpi_score"],
+                potential_category=s["potential_category"],
+                elevation_m=s["elevation_m"],
+                slope_pct=s["slope_pct"],
+                estimated_depth_range=s["estimated_depth_range"],
+                expected_yield_range=s["expected_yield_range"],
+                hydro_summary=s["hydro_summary"]
+            )
+            db.add(db_spot)
+
+        db.commit()
+        db.refresh(db_plot)
+
+        return PlotResponse(
+            id=db_plot.id,
+            plot_name=db_plot.plot_name,
+            state=db_plot.state,
+            district=db_plot.district,
+            mandal=db_plot.mandal,
+            village=db_plot.village,
+            survey_number=db_plot.survey_number,
+            area_acres=db_plot.area_acres,
+            area_hectares=db_plot.area_hectares,
+            centroid={"lat": db_plot.centroid_lat, "lon": db_plot.centroid_lon},
+            mean_gwpi_score=db_plot.mean_gwpi_score,
+            potential_category=db_plot.potential_category,
+            candidate_spots=[
+                CandidateSpotSchema(
+                    rank=s.rank,
+                    label=s.label,
+                    lat=s.lat,
+                    lon=s.lon,
+                    gwpi_score=s.gwpi_score,
+                    potential_category=s.potential_category,
+                    elevation_m=s.elevation_m,
+                    slope_pct=s.slope_pct,
+                    estimated_depth_range=s.estimated_depth_range,
+                    expected_yield_range=s.expected_yield_range,
+                    hydro_summary=s.hydro_summary
+                ) for s in db_plot.candidate_spots
+            ],
+            created_at=db_plot.created_at
+        )
+    finally:
+        if os.path.exists(temp_kml_path):
+            os.remove(temp_kml_path)
 
 
 @router.get("/{plot_id}/report.pdf")

@@ -1,7 +1,8 @@
 /**
- * BSMA GeoAI Borewell & Groundwater Siting Application (MVP v1.0)
- * Complete Full Siting Report Generator, PDF/HTML/GeoJSON/CSV Exporter,
- * PWA Service Worker, Pin-Drop & Polygon Tools, and Multilingual Localization.
+ * BSMA GeoAI Borewell & Groundwater Siting Application (MVP + Phase 1)
+ * Features: Client-side KML Upload, Preset Farm Switcher (Karun Farm 2 & Mango Farm),
+ * Full Siting Report Generator, PDF/HTML/GeoJSON/CSV Exporter, PWA Offline Service Worker,
+ * Pin-Drop & Polygon Tools, and Ground-Truth Feedback Loop.
  */
 
 // Multi-lingual dictionary
@@ -14,7 +15,7 @@ const I18N = {
     elevationRange: "Elevation",
     topSpots: "Top Recommended Spots",
     drawCustomPlot: "Draw Custom Plot",
-    resetPlot: "Reset to Karun Farm 2",
+    resetPlot: "Reset Farm",
     waltaStatus: "WALTA Compliance",
     waltaText: "Minimum 150m spacing between agricultural borewells required in Telangana hard-rock.",
     vesNoticeTitle: "Mandatory VES Field Verification",
@@ -30,6 +31,7 @@ const I18N = {
     high: "High (100)",
     shareReport: "Report",
     fullReportBtn: "Full Siting Report",
+    addOutcome: "Record Outcome",
     pinDropModeMsg: "📍 Pin-Drop Mode: Click anywhere on the map to evaluate a 300m radius parcel.",
     polyDrawModeMsg: "📐 Polygon Mode: Click on the map to place corner points (at least 3) for your custom plot."
   },
@@ -41,7 +43,7 @@ const I18N = {
     elevationRange: "ఎత్తు",
     topSpots: "సిఫార్సు చేయబడిన స్థానాలు",
     drawCustomPlot: "కొత్త భూమిని గీయండి",
-    resetPlot: "కరుణ్ ఫామ్ 2 కి రీసెట్ చేయండి",
+    resetPlot: "రీసెట్ చేయండి",
     waltaStatus: "వాల్టా (WALTA) నిబంధనలు",
     waltaText: "తెలంగాణ వాల్టా చట్టం ప్రకారం బోరుబావుల మధ్య కనీసం 150 మీటర్ల దూరం ఉండాలి.",
     vesNoticeTitle: "తప్పనిసరి VES రెసిస్టివిటీ సర్వే",
@@ -57,6 +59,7 @@ const I18N = {
     high: "అత్యధికం (100)",
     shareReport: "పూర్తి రిపోర్ట్",
     fullReportBtn: "పూర్తి రిపోర్ట్ డౌన్‌లోడ్",
+    addOutcome: "ఫలితం నమోదు",
     pinDropModeMsg: "📍 పిన్ డ్రాప్ మోడ్: 300 మీటర్ల పరిధిని అంచనా వేయడానికి మ్యాప్‌పై క్లిక్ చేయండి.",
     polyDrawModeMsg: "📐 సరిహద్దు గీసే మోడ్: మీ పొలం సరిహద్దులను గుర్తించడానికి కనీసం 3 పాయింట్లను క్లిక్ చేయండి."
   },
@@ -68,7 +71,7 @@ const I18N = {
     elevationRange: "ऊंचाई",
     topSpots: "शीर्ष अनुशंसित स्थान",
     drawCustomPlot: "नया खेत चिह्नित करें",
-    resetPlot: "करुण फार्म 2 पर रीसेट करें",
+    resetPlot: "रीसेट करें",
     waltaStatus: "वाल्टा (WALTA) अनुपालन",
     waltaText: "तेलंगाना वाल्टा नियमों के तहत बोरवेलों के बीच न्यूनतम 150 मीटर की दूरी अनिवार्य है।",
     vesNoticeTitle: "अनिवार्य VES भू-भौतिकीय जांच",
@@ -84,6 +87,7 @@ const I18N = {
     high: "उत्कृष्ट (100)",
     shareReport: "पूर्ण रिपोर्ट",
     fullReportBtn: "पूर्ण रिपोर्ट डाउनलोड",
+    addOutcome: "परिणाम दर्ज करें",
     pinDropModeMsg: "📍 पिन-ड्रॉप मोड: 300 मीटर दायरे का मूल्यांकन करने के लिए मानचित्र पर क्लिक करें।",
     polyDrawModeMsg: "📐 बहुभुज मोड: अपने खेत की सीमा बनाने के लिए कम से कम 3 बिंदुओं पर क्लिक करें।"
   }
@@ -92,6 +96,7 @@ const I18N = {
 let currentLang = 'en';
 let map;
 let defaultFarmGeoJSON = null;
+let mangoFarmGeoJSON = null;
 let currentAnalysis = null;
 let currentGeoJSON = null;
 let clientGrid = null;
@@ -182,25 +187,35 @@ function updateLanguageTexts() {
 
 async function loadData() {
   try {
-    const [reportRes, gridRes] = await Promise.all([
+    const [reportRes, mangoRes, gridRes] = await Promise.all([
       fetch('data/farm_siting_report.geojson'),
+      fetch('data/mangofarm_siting_report.geojson').catch(() => null),
       fetch('data/gwpi_grid.json')
     ]);
+    
     defaultFarmGeoJSON = await reportRes.json();
+    if (mangoRes && mangoRes.ok) {
+      mangoFarmGeoJSON = await mangoRes.json();
+    }
     clientGrid = await gridRes.json();
     currentGeoJSON = defaultFarmGeoJSON;
     
     // Save to LocalStorage for offline resilience
     localStorage.setItem('borewell_default_farm', JSON.stringify(defaultFarmGeoJSON));
+    if (mangoFarmGeoJSON) {
+      localStorage.setItem('borewell_mango_farm', JSON.stringify(mangoFarmGeoJSON));
+    }
     localStorage.setItem('borewell_grid', JSON.stringify(clientGrid));
   } catch (err) {
     console.warn("Loading from offline LocalStorage fallback:", err);
     const cachedFarm = localStorage.getItem('borewell_default_farm');
+    const cachedMango = localStorage.getItem('borewell_mango_farm');
     const cachedGrid = localStorage.getItem('borewell_grid');
     if (cachedFarm) {
       defaultFarmGeoJSON = JSON.parse(cachedFarm);
       currentGeoJSON = defaultFarmGeoJSON;
     }
+    if (cachedMango) mangoFarmGeoJSON = JSON.parse(cachedMango);
     if (cachedGrid) clientGrid = JSON.parse(cachedGrid);
   }
 }
@@ -415,6 +430,24 @@ function setupUIEventListeners() {
   document.getElementById('btnDrawPolygon').addEventListener('click', () => setToolMode('polygon'));
   document.getElementById('btnResetFarm').addEventListener('click', resetToDefaultFarm);
 
+  // KML Upload Handlers
+  const kmlBtn = document.getElementById('btnUploadKML');
+  const fileInput = document.getElementById('kmlFileInput');
+  if (kmlBtn && fileInput) {
+    kmlBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files.length > 0) {
+        handleKmlUpload(e.target.files[0]);
+      }
+    });
+  }
+
+  // Farm Preset Selector
+  const presetSelect = document.getElementById('farmPresetSelect');
+  if (presetSelect) {
+    presetSelect.addEventListener('change', (e) => handlePresetFarmChange(e.target.value));
+  }
+
   // Opacity Slider
   document.getElementById('opacitySlider').addEventListener('input', (e) => {
     const val = parseFloat(e.target.value) / 100.0;
@@ -439,6 +472,122 @@ function setupUIEventListeners() {
   document.getElementById('btnCloseFeedbackModal').addEventListener('click', closeFeedbackModal);
   document.getElementById('btnCancelFeedback').addEventListener('click', closeFeedbackModal);
   document.getElementById('feedbackForm').addEventListener('submit', handleFeedbackSubmit);
+}
+
+function handlePresetFarmChange(presetKey) {
+  setToolMode(null);
+  if (presetKey === 'mango_farm' && mangoFarmGeoJSON) {
+    renderFarmOnMap(mangoFarmGeoJSON);
+    renderFarmData(mangoFarmGeoJSON.farm_analysis);
+    map.flyTo({
+      center: [mangoFarmGeoJSON.farm_analysis.centroid.lon, mangoFarmGeoJSON.farm_analysis.centroid.lat],
+      zoom: 15.6
+    });
+  } else if (presetKey === 'karun_farm_2' && defaultFarmGeoJSON) {
+    renderFarmOnMap(defaultFarmGeoJSON);
+    renderFarmData(defaultFarmGeoJSON.farm_analysis);
+    map.flyTo({
+      center: [defaultFarmGeoJSON.farm_analysis.centroid.lon, defaultFarmGeoJSON.farm_analysis.centroid.lat],
+      zoom: 15.6
+    });
+  }
+}
+
+/* KML File Upload & Ingestion Parser */
+function handleKmlUpload(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    parseAndEvaluateKML(e.target.result, file.name);
+  };
+  reader.readAsText(file);
+}
+
+function parseAndEvaluateKML(kmlText, fileName = "Uploaded Farm") {
+  try {
+    const parser = new DOMParser();
+    const xmlDoc = parser.parseFromString(kmlText, "text/xml");
+    
+    // Check for parse error
+    const parseError = xmlDoc.getElementsByTagName("parsererror");
+    if (parseError.length > 0) {
+      alert("Invalid KML file format. Please ensure it is a valid Google Earth KML.");
+      return;
+    }
+
+    // Extract Name
+    let farmName = fileName.replace(/\.kml$/i, '');
+    const nameEl = xmlDoc.getElementsByTagName("name")[0];
+    if (nameEl && nameEl.textContent) {
+      farmName = nameEl.textContent.trim().replace(/\.kmz$/i, '');
+    }
+
+    // Extract Coordinates
+    const coordsEls = xmlDoc.getElementsByTagName("coordinates");
+    if (!coordsEls || coordsEls.length === 0) {
+      alert("No coordinates found in this KML file.");
+      return;
+    }
+
+    const rawCoords = coordsEls[0].textContent.trim();
+    const points = [];
+    const tuples = rawCoords.split(/\s+/);
+    
+    for (let tuple of tuples) {
+      if (!tuple.trim()) continue;
+      const parts = tuple.split(',');
+      if (parts.length >= 2) {
+        const lon = parseFloat(parts[0]);
+        const lat = parseFloat(parts[1]);
+        if (!isNaN(lon) && !isNaN(lat)) {
+          points.push([lon, lat]);
+        }
+      }
+    }
+
+    if (points.length < 3) {
+      alert("A valid polygon requires at least 3 coordinate points in the KML.");
+      return;
+    }
+
+    // Compute bounding box and fit map
+    let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
+    for (let p of points) {
+      if (p[0] < minLon) minLon = p[0];
+      if (p[0] > maxLon) maxLon = p[0];
+      if (p[1] < minLat) minLat = p[1];
+      if (p[1] > maxLat) maxLat = p[1];
+    }
+
+    map.fitBounds([[minLon, minLat], [maxLon, maxLat]], { padding: 80, maxZoom: 16.5 });
+
+    // Evaluate over grid
+    evaluateCustomPolygon(points, farmName);
+
+    // Update preset selector
+    const presetSelect = document.getElementById('farmPresetSelect');
+    if (presetSelect) {
+      let customOpt = presetSelect.querySelector('option[value="custom"]');
+      if (!customOpt) {
+        customOpt = document.createElement('option');
+        customOpt.value = 'custom';
+        presetSelect.appendChild(customOpt);
+      }
+      customOpt.textContent = `📁 ${farmName}`;
+      customOpt.disabled = false;
+      customOpt.selected = true;
+    }
+
+    // Show temporary notification banner
+    const banner = document.getElementById('instructionBanner');
+    const textEl = document.getElementById('instructionText');
+    banner.classList.add('visible');
+    textEl.textContent = `✓ Successfully loaded and analyzed KML: "${farmName}"`;
+    setTimeout(() => { banner.classList.remove('visible'); }, 4000);
+
+  } catch (err) {
+    console.error("Error parsing KML:", err);
+    alert("Error parsing KML file: " + err.message);
+  }
 }
 
 function setToolMode(mode) {
@@ -563,9 +712,9 @@ function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
         potential_category: pix.score >= 70 ? "High Potential" : "Moderate Potential",
         elevation_m: pix.elevation,
         slope_pct: pix.slope,
-        estimated_depth_range: "280 - 380 ft",
-        expected_yield_range: "1,500 - 2,500 LPH",
-        hydro_summary: "Identified along local moisture convergence and structural fracture lineament in weathered granite."
+        estimated_depth_range: "280 - 400 ft",
+        expected_yield_range: "1,500 - 2,500 LPH (approx 1.0 - 1.5 inch)",
+        hydro_summary: "Located on a gentle slope with favorable fracture density and moisture convergence in the weathered granite zone."
       });
     }
     if (selected.length >= 3) break;
@@ -619,14 +768,9 @@ function pointInPolygon(point, vs) {
 
 function resetToDefaultFarm() {
   setToolMode(null);
-  if (defaultFarmGeoJSON) {
-    renderFarmOnMap(defaultFarmGeoJSON);
-    renderFarmData(defaultFarmGeoJSON.farm_analysis);
-    map.flyTo({
-      center: [defaultFarmGeoJSON.farm_analysis.centroid.lon, defaultFarmGeoJSON.farm_analysis.centroid.lat],
-      zoom: 15.6
-    });
-  }
+  const presetSelect = document.getElementById('farmPresetSelect');
+  if (presetSelect) presetSelect.value = 'karun_farm_2';
+  handlePresetFarmChange('karun_farm_2');
 }
 
 /* ==========================================================================
@@ -646,6 +790,16 @@ function openReportModal() {
   
   document.getElementById('modalReportDate').textContent = new Date().toISOString().split('T')[0];
   document.getElementById('modalReportId').textContent = `BSMA-GW-${Date.now().toString().slice(-6)}`;
+
+  // Update Figure 1 Map Image depending on active farm
+  const mapImg = document.getElementById('modalMapImg');
+  if (mapImg) {
+    if (currentAnalysis.farm_name.includes('Mango') || currentAnalysis.farm_name.includes('Farmland 1')) {
+      mapImg.src = 'data/mangofarm_siting_plan.png';
+    } else {
+      mapImg.src = 'data/farm_siting_plan.png';
+    }
+  }
 
   // Populate Section 3: Table
   const tBody = document.getElementById('modalTableBody');
@@ -693,14 +847,26 @@ function closeReportModal() {
 
 /* 1. Download Full PDF Report */
 function downloadPdfReport() {
-  const isDefaultFarm = currentAnalysis && defaultFarmGeoJSON && 
-    currentAnalysis.farm_name === defaultFarmGeoJSON.farm_analysis.farm_name;
+  if (!currentAnalysis) return;
 
-  if (isDefaultFarm) {
+  const isKarunFarm = defaultFarmGeoJSON && currentAnalysis.farm_name === defaultFarmGeoJSON.farm_analysis.farm_name;
+  const isMangoFarm = currentAnalysis.farm_name.includes('Mango') || currentAnalysis.farm_name.includes('Farmland 1');
+
+  if (isKarunFarm) {
     // Direct instant download of the complete 2-page publication-grade PDF
     const a = document.createElement('a');
     a.href = 'data/Borewell_Siting_Full_Report.pdf';
     a.download = `Borewell_Siting_Full_Report_${currentAnalysis.farm_name.replace(/\s+/g, '_')}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+
+  if (isMangoFarm) {
+    const a = document.createElement('a');
+    a.href = 'data/Borewell_Siting_Full_Report_MangoFarm.pdf';
+    a.download = `Borewell_Siting_Full_Report_MangoFarm.pdf`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -873,4 +1039,3 @@ async function handleFeedbackSubmit(e) {
     closeFeedbackModal();
   }, 2200);
 }
-

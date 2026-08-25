@@ -1,9 +1,9 @@
 /**
- * BSMA GeoAI Borewell Siting App — Service Worker
- * Offline caching for App Shell, precomputed raster/vector datasets, and Map tiles.
+ * BSMA GeoAI Borewell Siting App — Service Worker (v2.0.0)
+ * Network-First for App Shell (Instant live updates) + Cache fallback for 100% offline usage.
  */
 
-const CACHE_NAME = 'borewell-ai-v1.0.0';
+const CACHE_NAME = 'borewell-ai-v2.0.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -13,28 +13,33 @@ const STATIC_ASSETS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './data/farm_siting_report.geojson',
+  './data/mangofarm_siting_report.geojson',
   './data/gwpi_grid.json',
   './data/catchment_gwpi_map.png',
-  './data/farm_siting_plan.png'
+  './data/farm_siting_plan.png',
+  './data/mangofarm_siting_plan.png',
+  './data/Borewell_Siting_Full_Report.pdf',
+  './data/Borewell_Siting_Full_Report_MangoFarm.pdf'
 ];
 
 // External CDNs to cache on install
 const EXTERNAL_ASSETS = [
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css',
   'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js',
   'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap'
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[Service Worker] Caching static assets & app shell...');
+      console.log('[Service Worker v2] Caching static assets & app shell...');
       try {
         await cache.addAll(STATIC_ASSETS);
       } catch (err) {
-        console.warn('[Service Worker] Local asset caching partial:', err);
+        console.warn('[Service Worker v2] Local asset caching partial:', err);
       }
-      return self.skipWaiting();
     })
   );
 });
@@ -45,7 +50,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            console.log('[Service Worker] Removing old cache:', cache);
+            console.log('[Service Worker v2] Removing old cache:', cache);
             return caches.delete(cache);
           }
         })
@@ -58,8 +63,8 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // 1. Map Tiles & CDN Assets: Stale-While-Revalidate with caching
-  if (url.origin.includes('tile.openstreetmap.org') || url.origin.includes('unpkg.com') || url.origin.includes('fonts.')) {
+  // 1. Map Tiles & External CDNs: Stale-While-Revalidate with caching
+  if (url.origin.includes('tile.openstreetmap.org') || url.origin.includes('unpkg.com') || url.origin.includes('fonts.') || url.origin.includes('cdnjs.')) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cachedResponse = await cache.match(request);
@@ -76,27 +81,28 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. App Shell & Data Files: Cache-First with network fallback
+  // 2. App Shell & Data: Network-First with Cache Fallback (Ensures fresh updates, falls back to cache if offline)
   event.respondWith(
-    caches.match(request).then((response) => {
-      if (response) {
-        return response;
-      }
-      return fetch(request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+    fetch(request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(request, responseToCache);
+          });
         }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(request, responseToCache);
-        });
         return networkResponse;
-      }).catch(() => {
-        // Offline fallback for navigation
-        if (request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
+      })
+      .catch(() => {
+        // If network is offline, serve from cache
+        return caches.match(request).then((cachedResponse) => {
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          if (request.mode === 'navigate') {
+            return caches.match('./index.html');
+          }
+        });
+      })
   );
 });

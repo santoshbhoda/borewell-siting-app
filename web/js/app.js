@@ -346,22 +346,29 @@ function addCatchmentOverlay() {
 
 function renderFarmOnMap(geojson) {
   currentGeoJSON = geojson;
+  
+  // Clean features for MapLibre GeoJSON Source
+  const cleanGeoJSON = {
+    type: 'FeatureCollection',
+    features: geojson.features || []
+  };
+
   if (map.getSource('farm-boundary-source')) {
-    map.getSource('farm-boundary-source').setData(geojson);
+    map.getSource('farm-boundary-source').setData(cleanGeoJSON);
   } else {
     map.addSource('farm-boundary-source', {
       type: 'geojson',
-      data: geojson
+      data: cleanGeoJSON
     });
 
     map.addLayer({
       id: 'farm-boundary-fill',
       type: 'fill',
       source: 'farm-boundary-source',
-      filter: ['==', '$type', 'Polygon'],
+      filter: ['==', ['geometry-type'], 'Polygon'],
       paint: {
         'fill-color': '#16a34a',
-        'fill-opacity': 0.18
+        'fill-opacity': 0.22
       }
     });
 
@@ -369,9 +376,9 @@ function renderFarmOnMap(geojson) {
       id: 'farm-boundary-line',
       type: 'line',
       source: 'farm-boundary-source',
-      filter: ['==', '$type', 'Polygon'],
+      filter: ['==', ['geometry-type'], 'Polygon'],
       paint: {
-        'line-color': '#b91c1c',
+        'line-color': '#dc2626',
         'line-width': 3,
         'line-dasharray': [2, 1]
       }

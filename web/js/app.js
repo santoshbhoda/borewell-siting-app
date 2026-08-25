@@ -355,11 +355,12 @@ function renderFarmOnMap(geojson) {
 }
 
 function getRegionalLithology(lat, lon) {
-  // 1. Deccan Volcanic Province / Deccan Traps (Maharashtra, N. Karnataka, NW Telangana)
+  // 1. Maharashtra Deccan Volcanic Basalt (Deccan Traps)
+  // Strictly West of Lon 77.5°E in Maharashtra, or Vidarbha north of 19.8°N
   if (
-    (lat >= 16.0 && lat <= 22.0 && lon >= 72.5 && lon <= 79.2) || // Maharashtra core & Marathwada
-    (lat >= 18.0 && lat <= 22.2 && lon >= 72.5 && lon <= 80.5) || // Vidarbha & Khandesh
-    (lat >= 15.5 && lat <= 18.0 && lon >= 74.0 && lon <= 77.5)    // N. Karnataka (Bijapur, Bidar, Belgaum)
+    (lat >= 15.8 && lat <= 22.0 && lon >= 72.6 && lon < 77.5) || // Western Maharashtra, Pune, Solapur, Marathwada, Nashik
+    (lat >= 19.8 && lat <= 21.8 && lon >= 77.0 && lon <= 79.8) || // Vidarbha (Nagpur, Wardha, Amravati)
+    (lat >= 16.8 && lat <= 18.2 && lon >= 76.0 && lon <= 77.3)    // N. Karnataka Basalt (Bidar, Bijapur)
   ) {
     return {
       name: "Deccan Basalt",
@@ -372,7 +373,7 @@ function getRegionalLithology(lat, lon) {
   }
 
   // 2. Godavari - Pranhita Graben / Gondwana Basin (Telangana/Maharashtra border, Bhadradri, Mancherial, Chandrapur)
-  if (lat >= 17.3 && lat <= 19.9 && lon >= 79.3 && lon <= 81.2) {
+  if (lat >= 17.3 && lat <= 19.8 && lon >= 79.3 && lon <= 80.8) {
     return {
       name: "Gondwana Sandstone",
       full: "Lower Gondwana Supergroup (Barakar / Kamthi Sandstone & Shale)",
@@ -396,7 +397,7 @@ function getRegionalLithology(lat, lon) {
   }
 
   // 4. Eastern Ghats Mobile Belt (EGMB - North Coastal AP, Odisha)
-  if (lat >= 16.5 && lat <= 20.5 && lon >= 81.6 && lon <= 85.5) {
+  if (lat >= 16.8 && lat <= 20.5 && lon >= 81.8 && lon <= 85.5) {
     return {
       name: "Charnockite & Khondalite",
       full: "Eastern Ghats Granulite Terrain (Charnockite, Khondalite & Quartzites)",
@@ -408,7 +409,7 @@ function getRegionalLithology(lat, lon) {
   }
 
   // 5. Coastal Alluvial Belts (Krishna, Godavari, Cauvery Delta)
-  if (lon >= 80.2 && lat >= 10.5 && lat <= 17.5) {
+  if (lon >= 80.4 && lat >= 13.0 && lat <= 17.2) {
     return {
       name: "Quaternary Alluvium",
       full: "Deltaic & Riverine Alluvium (Sand, Gravel, Silt & Clay)",
@@ -431,14 +432,160 @@ function getRegionalLithology(lat, lon) {
     };
   }
 
-  // 7. Peninsular Gneissic Complex & Dharwar Craton (Core Telangana, Eastern Karnataka, Central Tamil Nadu)
+  // 7. Peninsular Gneissic Complex & Dharwar Craton (Telangana, Karnataka PGC, Central Tamil Nadu)
   return {
     name: "Weathered Gneiss",
-    full: "Peninsular Gneissic Complex & Dharwar Craton (Granite, Biotite Gneiss & Migmatite)",
+    full: "Peninsular Gneissic Complex (Granite, Biotite Gneiss & Saprolite)",
     aquifer_type: "Weathered Saprolite (Grus) Mantle & Deep Secondary Fracture Network",
     drilling_technique: "DTH rotary hammer with 40-60 ft casing through weathered saprolite",
     casing_depth: "40 - 60 ft",
     typical_yield: "1,500 - 3,500 LPH"
+  };
+}
+
+function getRegionalLocationInfo(lat, lon) {
+  // 1. Telangana Districts & Sub-basins
+  if (lat >= 15.8 && lat <= 19.9 && lon >= 77.2 && lon <= 81.5) {
+    let district = "Telangana Region";
+    let basin = "Krishna / Godavari Basin";
+    let state = "Telangana";
+
+    if (lat >= 17.2 && lat <= 17.7 && lon >= 78.7 && lon <= 79.5) {
+      district = "Yadadri-Bhuvanagiri / Jangaon";
+      basin = "Musi Sub-Basin";
+    } else if (lat >= 17.1 && lat <= 17.6 && lon >= 78.1 && lon <= 78.7) {
+      district = "Hyderabad / Ranga Reddy";
+      basin = "Musi River Basin";
+    } else if (lat >= 17.5 && lat <= 18.2 && lon >= 78.1 && lon <= 78.9) {
+      district = "Medak / Siddipet";
+      basin = "Manjira Sub-Basin";
+    } else if (lat >= 16.3 && lat <= 17.2 && lon >= 77.7 && lon <= 78.6) {
+      district = "Mahabubnagar / Nagarkurnool";
+      basin = "Krishna River Basin";
+    } else if (lat >= 16.7 && lat <= 17.3 && lon >= 78.8 && lon <= 79.8) {
+      district = "Nalgonda / Suryapet";
+      basin = "Musi-Krishna Confluence";
+    } else if (lat >= 17.7 && lat <= 18.5 && lon >= 79.2 && lon <= 80.2) {
+      district = "Warangal / Hanamkonda";
+      basin = "Godavari Sub-Basin";
+    } else if (lat >= 18.5 && lat <= 19.8 && lon >= 78.8 && lon <= 80.5) {
+      district = "Karimnagar / Mancherial / Adilabad";
+      basin = "Godavari-Pranhita Basin";
+    } else if (lat >= 17.0 && lat <= 18.0 && lon >= 80.0 && lon <= 81.2) {
+      district = "Khammam / Bhadradri-Kothagudem";
+      basin = "Lower Godavari Basin";
+    }
+
+    return {
+      district,
+      basin,
+      state,
+      displayText: `${district} | ${basin}, ${state}`
+    };
+  }
+
+  // 2. Maharashtra Districts & Basins
+  if (lat >= 15.6 && lat <= 22.1 && lon >= 72.6 && lon <= 80.8) {
+    let district = "Maharashtra Plateau";
+    let basin = "Godavari / Bhima / Krishna Basin";
+    let state = "Maharashtra";
+
+    if (lat >= 18.2 && lat <= 19.0 && lon >= 73.5 && lon <= 74.5) {
+      district = "Pune / Haveli";
+      basin = "Bhima River Sub-Basin";
+    } else if (lat >= 17.3 && lat <= 18.2 && lon >= 75.3 && lon <= 76.5) {
+      district = "Solapur / Pandharpur";
+      basin = "Sina-Bhima Basin";
+    } else if (lat >= 19.5 && lat <= 20.3 && lon >= 75.0 && lon <= 76.0) {
+      district = "Chhatrapati Sambhajinagar (Aurangabad)";
+      basin = "Upper Godavari Basin";
+    } else if (lat >= 19.5 && lat <= 20.5 && lon >= 73.5 && lon <= 74.5) {
+      district = "Nashik / Trimbak";
+      basin = "Upper Godavari Basin";
+    } else if (lat >= 18.8 && lat <= 19.5 && lon >= 76.5 && lon <= 77.8) {
+      district = "Nanded / Parbhani";
+      basin = "Godavari River Basin";
+    } else if (lat >= 20.5 && lat <= 21.5 && lon >= 78.5 && lon <= 79.5) {
+      district = "Nagpur / Wardha";
+      basin = "Wainganga-Wardha Basin";
+    } else if (lat >= 16.5 && lat <= 17.3 && lon >= 74.0 && lon <= 75.0) {
+      district = "Kolhapur / Sangli";
+      basin = "Krishna River Basin";
+    } else if (lat >= 17.5 && lat <= 18.5 && lon >= 76.5 && lon <= 77.5) {
+      district = "Latur / Osmanabad (Dharashiv)";
+      basin = "Manjara River Basin";
+    }
+
+    return {
+      district,
+      basin,
+      state,
+      displayText: `${district} | ${basin}, ${state}`
+    };
+  }
+
+  // 3. Karnataka Districts & Basins
+  if (lat >= 11.5 && lat <= 18.5 && lon >= 74.0 && lon <= 78.6) {
+    let district = "Karnataka Plateau";
+    let basin = "Cauvery / Krishna Basin";
+    let state = "Karnataka";
+
+    if (lat >= 12.7 && lat <= 13.3 && lon >= 77.3 && lon <= 78.0) {
+      district = "Bengaluru Rural / Urban";
+      basin = "Arkavathi / Ponnaiyar Basin";
+    } else if (lat >= 13.0 && lat <= 13.5 && lon >= 78.0 && lon <= 78.6) {
+      district = "Kolar / Chikkaballapur";
+      basin = "Palar Sub-Basin";
+    } else if (lat >= 15.0 && lat <= 16.0 && lon >= 74.8 && lon <= 75.8) {
+      district = "Dharwad / Hubballi";
+      basin = "Malaprabha Basin";
+    } else if (lat >= 16.5 && lat <= 17.5 && lon >= 76.5 && lon <= 77.5) {
+      district = "Kalaburagi (Gulbarga) / Bidar";
+      basin = "Bhima-Karanja Basin";
+    }
+
+    return {
+      district,
+      basin,
+      state,
+      displayText: `${district} | ${basin}, ${state}`
+    };
+  }
+
+  // 4. Andhra Pradesh Districts & Basins
+  if (lat >= 13.5 && lat <= 19.2 && lon >= 76.8 && lon <= 84.8) {
+    let district = "Andhra Pradesh";
+    let basin = "Krishna / Pennar / Godavari Basin";
+    let state = "Andhra Pradesh";
+
+    if (lat >= 14.0 && lat <= 15.0 && lon >= 78.3 && lon <= 79.2) {
+      district = "YSR Kadapa";
+      basin = "Pennar River Basin";
+    } else if (lat >= 15.3 && lat <= 16.2 && lon >= 77.5 && lon <= 78.8) {
+      district = "Kurnool / Nandyal";
+      basin = "Tungabhadra-Krishna Basin";
+    } else if (lat >= 16.0 && lat <= 17.0 && lon >= 80.0 && lon <= 81.2) {
+      district = "Guntur / Vijayawada";
+      basin = "Krishna Delta Basin";
+    } else if (lat >= 16.8 && lat <= 18.0 && lon >= 81.5 && lon <= 83.5) {
+      district = "East Godavari / Visakhapatnam";
+      basin = "Godavari / Eastern Coastal Basin";
+    }
+
+    return {
+      district,
+      basin,
+      state,
+      displayText: `${district} | ${basin}, ${state}`
+    };
+  }
+
+  // 5. General India Fallback
+  return {
+    district: `Coordinates (${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E)`,
+    basin: "Regional Watershed",
+    state: "India",
+    displayText: `Coordinates (${lat.toFixed(2)}°N, ${lon.toFixed(2)}°E) | Regional Watershed`
   };
 }
 
@@ -457,6 +604,10 @@ function renderFarmData(analysis) {
   const litho = analysis.lithology_info || getRegionalLithology(lat, lon);
   const lithoEl = document.getElementById('lithologyVal');
   if (lithoEl) lithoEl.textContent = litho.name;
+
+  const locationInfo = analysis.location_info || getRegionalLocationInfo(lat, lon);
+  const regionSubEl = document.getElementById('regionSubText');
+  if (regionSubEl) regionSubEl.textContent = locationInfo.displayText;
 
   // Summary Text
   const summaryEl = document.getElementById('summaryText');
@@ -863,6 +1014,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
   ];
 
   const litho = getRegionalLithology(cLat, cLon);
+  const locationInfo = getRegionalLocationInfo(cLat, cLon);
 
   const customAnalysis = {
     farm_name: customName,
@@ -870,6 +1022,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     farm_area_hectares: approxHectares,
     centroid: { lon: Number(cLon.toFixed(5)), lat: Number(cLat.toFixed(5)) },
     lithology_info: litho,
+    location_info: locationInfo,
     score_statistics: {
       min: Number((meanScore - 5.0).toFixed(1)),
       max: Number((meanScore + 5.0).toFixed(1)),
@@ -900,7 +1053,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     setToolMode(null);
   }
 
-  textEl.textContent = `✓ Sited: ${customName} (${category} | Lithology: ${litho.name} | Slope: ${slopePct.toFixed(1)}%)`;
+  textEl.textContent = `✓ Sited: ${customName} (${category} | Lithology: ${litho.name} | ${locationInfo.district})`;
   setTimeout(() => { banner.classList.remove('visible'); }, 4500);
 }
 
@@ -926,8 +1079,15 @@ function openReportModal() {
     `${currentAnalysis.score_statistics.mean} / 100 (${currentAnalysis.score_statistics.category})`;
   
   const litho = currentAnalysis.lithology_info || getRegionalLithology(currentAnalysis.centroid.lat, currentAnalysis.centroid.lon);
+  const locationInfo = currentAnalysis.location_info || getRegionalLocationInfo(currentAnalysis.centroid.lat, currentAnalysis.centroid.lon);
+
   const modalLitho = document.getElementById('modalLithology');
   if (modalLitho) modalLitho.textContent = litho.full;
+
+  const modalRegionSub = document.getElementById('modalRegionSubText');
+  if (modalRegionSub) {
+    modalRegionSub.textContent = `${litho.name} Formation | ${locationInfo.displayText}`;
+  }
 
   document.getElementById('modalReportDate').textContent = new Date().toISOString().split('T')[0];
   document.getElementById('modalReportId').textContent = `BSMA-GW-${Date.now().toString().slice(-6)}`;

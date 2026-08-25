@@ -241,8 +241,9 @@ function initMap() {
   L.control.zoom({ position: 'topright' }).addTo(map);
   L.control.scale({ imperial: false, position: 'bottomright' }).addTo(map);
 
-  // 1. Street Basemap Layer (OpenStreetMap & CartoDB tiles)
-  streetLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  // 1. Street Basemap Layer (OpenStreetMap parallel multi-subdomains)
+  streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    subdomains: ['a', 'b', 'c'],
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
@@ -288,9 +289,14 @@ function renderFarmOnMap(geojson) {
     farmBoundaryLayer = null;
   }
 
-  // Draw boundary polygon
-  if (geojson && geojson.features && geojson.features.length > 0) {
-    farmBoundaryLayer = L.geoJSON(geojson, {
+  // Filter only Polygon features for boundary drawing
+  const polygonFeatures = {
+    type: 'FeatureCollection',
+    features: (geojson.features || []).filter(f => f.geometry && (f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon'))
+  };
+
+  if (polygonFeatures.features.length > 0) {
+    farmBoundaryLayer = L.geoJSON(polygonFeatures, {
       style: function (feature) {
         return {
           color: '#dc2626',

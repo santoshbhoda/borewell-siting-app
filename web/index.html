@@ -33,29 +33,30 @@
     <!-- Top Header Bar -->
     <header class="top-header">
       <div class="brand-badge">
-        <div class="brand-logo">🌊</        <div class="brand-info">
+        <div class="brand-logo">🌊</div>
+        <div class="brand-info">
           <h1 data-i18n="appTitle">Borewell Siting AI</h1>
           <p data-i18n="subTitle">Open GeoAI Groundwater Prospecting</p>
         </div>
       </div>
 
       <div class="header-controls">
-        <div id="networkStatus" class="network-badge">
+        <div id="networkStatus" class="network-badge hide-mobile">
           <span style="width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block;"></span>
           <span id="networkText">Online</span>
         </div>
         <select id="langSelect" class="lang-dropdown">
-          <option value="en" selected>English</option>
-          <option value="te">తెలుగు (Telugu)</option>
-          <option value="hi">हिन्दी (Hindi)</option>
+          <option value="en" selected>EN</option>
+          <option value="te">తెలుగు</option>
+          <option value="hi">हिन्दी</option>
         </select>
         <button id="btnOpenReport" class="btn-header btn-highlight" title="Download & View Full Report">
-          📥 <span data-i18n="fullReportBtn">Full Siting Report</span>
+          📥 <span class="btn-text" data-i18n="fullReportBtn">Full Siting Report</span>
         </button>
         <button id="btnOpenFeedback" class="btn-header" style="background: #16a34a; color: white; border-color: #16a34a;" title="Submit Actual Drilling Outcome for ML Retraining">
-          📝 <span data-i18n="addOutcome">Record Outcome</span>
+          📝 <span class="btn-text" data-i18n="addOutcome">Record Outcome</span>
         </button>
-        <button id="btnInstallPwa" class="btn-header" style="display: none; background: #0284c7; color: white;" title="Install App on Phone">📲 Install</button>
+        <button id="btnInstallPwa" class="btn-header" style="display: none; background: #0284c7; color: white;" title="Install App on Phone">📲 <span class="btn-text">Install</span></button>
       </div>
     </header>
 
@@ -145,6 +146,7 @@
 
     <!-- Siting Results Side Panel / Drawer -->
     <aside id="resultsDrawer" class="results-drawer">
+      <div class="mobile-drag-handle" id="mobileDrawerHandle"></div>
       <div class="drawer-header">
         <div>
           <h2 id="farmNameDisplay">Farmland Groundwater Siting</h2>

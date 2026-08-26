@@ -251,20 +251,21 @@ function initMap() {
   });
 }
 
-/* User GPS Geolocation Tracking */
+let userAccuracyCircle = null;
+let gpsWatchId = null;
+
+/* High-Precision Hardware GPS Geolocation Tracking */
 function initUserLocation() {
   if ('geolocation' in navigator) {
+    // Stage 1: Request instant zero-cache hardware GPS fix
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        setUserGpsMarker(lat, lon);
-        map.setView([lat, lon], 16, { animate: true });
+        handleGpsPosition(pos, false);
       },
       (err) => {
-        console.warn("GPS location permission:", err.message);
+        console.warn("GPS location notice:", err.message);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   }
 }
@@ -274,36 +275,87 @@ function locateUser() {
   const textEl = document.getElementById('instructionText');
   
   if (!navigator.geolocation) {
-    alert("Geolocation is not supported by your browser.");
+    alert("Geolocation is not supported by your device browser.");
     return;
   }
 
   banner.classList.add('visible');
-  textEl.textContent = "📡 Acquiring high-precision GPS coordinates...";
+  textEl.textContent = "📡 Locking onto satellite GPS signals (acquiring high precision)...";
 
-  navigator.geolocation.getCurrentPosition(
+  if (gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+  }
+
+  let fixCount = 0;
+
+  // Start continuous satellite watch for progressively refined precision
+  gpsWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
-      setUserGpsMarker(lat, lon);
-      map.setView([lat, lon], 17, { animate: true });
-      textEl.textContent = `📍 Centered on your GPS Location (${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E)`;
-      setTimeout(() => { banner.classList.remove('visible'); }, 3500);
+      fixCount++;
+      handleGpsPosition(pos, true);
+
+      const acc = Math.round(pos.coords.accuracy);
+      if (acc <= 30 || fixCount >= 4) {
+        // High precision achieved (<=30m), stop active watch to conserve battery
+        if (gpsWatchId !== null) {
+          navigator.geolocation.clearWatch(gpsWatchId);
+          gpsWatchId = null;
+        }
+      }
     },
     (err) => {
       console.warn("GPS error:", err);
-      alert("Could not retrieve GPS location. Please allow location permissions in your browser.");
-      banner.classList.remove('visible');
+      textEl.textContent = "⚠️ Could not acquire GPS lock. Please ensure GPS/Location is enabled in device settings.";
+      setTimeout(() => { banner.classList.remove('visible'); }, 5000);
     },
-    { enableHighAccuracy: true, timeout: 12000 }
+    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
   );
 }
 
-function setUserGpsMarker(lat, lon) {
+function handleGpsPosition(pos, showFeedback = false) {
+  const lat = pos.coords.latitude;
+  const lon = pos.coords.longitude;
+  const accuracy = pos.coords.accuracy || 15;
+
+  setUserGpsMarker(lat, lon, accuracy);
+
+  // Zoom based on accuracy: tighter zoom for higher accuracy
+  const targetZoom = accuracy < 50 ? 17 : accuracy < 200 ? 16 : 15;
+  map.setView([lat, lon], targetZoom, { animate: true });
+
+  if (showFeedback) {
+    const banner = document.getElementById('instructionBanner');
+    const textEl = document.getElementById('instructionText');
+    banner.classList.add('visible');
+    
+    if (accuracy <= 50) {
+      textEl.textContent = `✓ High-Precision GPS Lock: ±${Math.round(accuracy)}m (${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E)`;
+    } else {
+      textEl.textContent = `📍 GPS Position: ±${Math.round(accuracy)}m accuracy (${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E)`;
+    }
+    setTimeout(() => { banner.classList.remove('visible'); }, 4000);
+  }
+}
+
+function setUserGpsMarker(lat, lon, accuracy = 20) {
   if (userLocationMarker) {
     map.removeLayer(userLocationMarker);
   }
+  if (userAccuracyCircle) {
+    map.removeLayer(userAccuracyCircle);
+  }
 
+  // Visual Accuracy Circle (shows exact GPS radius precision)
+  userAccuracyCircle = L.circle([lat, lon], {
+    radius: Math.max(8, accuracy),
+    color: '#0284c7',
+    weight: 1.5,
+    fillColor: '#0284c7',
+    fillOpacity: 0.12
+  }).addTo(map);
+
+  // Pulsing Pin Beacon
   const icon = L.divIcon({
     className: 'custom-map-marker-container',
     html: `
@@ -316,8 +368,16 @@ function setUserGpsMarker(lat, lon) {
     iconAnchor: [10, 10]
   });
 
+  const popupHtml = `
+    <div style="font-family: sans-serif; padding: 4px;">
+      <strong style="color: #0284c7;">📍 Your Live Location</strong><br/>
+      <code>${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E</code><br/>
+      <span style="font-size: 10.5px; color: #64748b;">GPS Accuracy: ±${Math.round(accuracy)} meters</span>
+    </div>
+  `;
+
   userLocationMarker = L.marker([lat, lon], { icon, zIndexOffset: 1000 })
-    .bindPopup(`<strong>📍 Your Live Location</strong><br/><code>${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E</code>`)
+    .bindPopup(popupHtml)
     .addTo(map);
 }
 
@@ -752,6 +812,9 @@ function setupUIEventListeners() {
 
   const restoreBtn = document.getElementById('btnRestoreDrawer');
   if (restoreBtn) restoreBtn.addEventListener('click', () => toggleDrawer(false));
+
+  const mobileHandle = document.getElementById('mobileDrawerHandle');
+  if (mobileHandle) mobileHandle.addEventListener('click', () => toggleDrawer());
 
   document.getElementById('btnDropPin').addEventListener('click', () => setToolMode('pin'));
   document.getElementById('btnDrawPolygon').addEventListener('click', () => setToolMode('polygon'));

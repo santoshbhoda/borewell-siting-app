@@ -33,10 +33,9 @@
     <!-- Top Header Bar -->
     <header class="top-header">
       <div class="brand-badge">
-        <div class="brand-logo">🌊</div>
-        <div class="brand-info">
+        <div class="brand-logo">🌊</        <div class="brand-info">
           <h1 data-i18n="appTitle">Borewell Siting AI</h1>
-          <p data-i18n="subTitle">GeoAI Groundwater Prospecting (Musi Basin)</p>
+          <p data-i18n="subTitle">Open GeoAI Groundwater Prospecting</p>
         </div>
       </div>
 
@@ -45,11 +44,6 @@
           <span style="width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block;"></span>
           <span id="networkText">Online</span>
         </div>
-        <select id="farmPresetSelect" class="lang-dropdown" title="Select Preloaded Farm or Custom KML">
-          <option value="karun_farm_2" selected>Karun Farm 2 (14.8 Ac)</option>
-          <option value="mango_farm">Mango Farm (20.4 Ac)</option>
-          <option value="custom" disabled>Custom Uploaded KML</option>
-        </select>
         <select id="langSelect" class="lang-dropdown">
           <option value="en" selected>English</option>
           <option value="te">తెలుగు (Telugu)</option>
@@ -67,8 +61,20 @@
 
     <!-- Floating Map Action Tools -->
     <div class="map-tools-bar">
+      <!-- GPS Current Location Tool -->
+      <button id="btnCurrentLocation" class="tool-btn" title="Locate My GPS Position">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="7"></circle>
+          <line x1="12" y1="1" x2="12" y2="5"></line>
+          <line x1="12" y1="19" x2="12" y2="23"></line>
+          <line x1="1" y1="12" x2="5" y2="12"></line>
+          <line x1="19" y1="12" x2="23" y2="12"></line>
+          <circle cx="12" cy="12" r="2" fill="currentColor"></circle>
+        </svg>
+      </button>
+
       <!-- Satellite / Street Toggle Tool -->
-      <button id="btnToggleSatellite" class="tool-btn" title="Toggle Satellite / Street View">
+      <button id="btnToggleSatellite" class="tool-btn active" title="Toggle Satellite / Street View">
         🛰️
       </button>
 
@@ -97,8 +103,16 @@
         </svg>
       </button>
 
+      <!-- Toggle Details Panel (Dock/Undock) -->
+      <button id="btnToggleDrawer" class="tool-btn" title="Toggle Report Panel (Dock / Undock)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="15" y1="3" x2="15" y2="21"></line>
+        </svg>
+      </button>
+
       <!-- Reset Tool -->
-      <button id="btnResetFarm" class="tool-btn" title="Reset Farm">
+      <button id="btnResetFarm" class="tool-btn" title="Reset Map View">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
           <path d="M3 3v5h5"/>
@@ -108,6 +122,11 @@
 
     <!-- Map Canvas -->
     <div id="map"></div>
+
+    <!-- Floating Restore Panel Button (Shown when pane is docked/collapsed) -->
+    <button id="btnRestoreDrawer" class="drawer-restore-btn" title="Expand Report Pane">
+      📊 <span>Report Panel</span>
+    </button>
 
     <!-- Map Legend & Layer Controls -->
     <div class="map-legend">
@@ -125,45 +144,50 @@
     </div>
 
     <!-- Siting Results Side Panel / Drawer -->
-    <aside class="results-drawer">
+    <aside id="resultsDrawer" class="results-drawer">
       <div class="drawer-header">
         <div>
-          <h2 id="farmNameDisplay">Karun Farm 2</h2>
-          <span id="regionSubText" style="font-size: 11px; color: var(--text-muted);">Yadadri-Bhuvanagiri / Musi Basin</span>
+          <h2 id="farmNameDisplay">Farmland Groundwater Siting</h2>
+          <span id="regionSubText" style="font-size: 11px; color: var(--text-muted);">Select or drop a pin to evaluate</span>
         </div>
-        <span id="farmCategoryDisplay" class="status-tag status-high">High Potential</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="farmCategoryDisplay" class="status-tag status-high">Ready</span>
+          <button id="btnDockDrawer" class="drawer-dock-btn" title="Collapse / Dock Panel">
+            ✕ <span class="hide-mobile">Hide</span>
+          </button>
+        </div>
       </div>
 
       <div class="drawer-body">
         <!-- Interactive Instruction Banner -->
-        <div id="instructionBanner" class="instruction-banner">
-          <span id="instructionText">Click anywhere on the map to evaluate and site candidate borewells.</span>
+        <div id="instructionBanner" class="instruction-banner visible">
+          <span id="instructionText">📍 Use your live GPS location, drop a pin, or upload a KML to site borewells.</span>
         </div>
 
         <!-- Metric Grid -->
         <div class="metric-grid">
           <div class="metric-card">
             <div class="label" data-i18n="meanPotential">Mean Potential</div>
-            <div id="meanScoreVal" class="value">66.5 / 100</div>
+            <div id="meanScoreVal" class="value">-- / 100</div>
           </div>
           <div class="metric-card">
             <div class="label" data-i18n="landArea">Land Area</div>
-            <div id="areaVal" class="value">14.8 Acres</div>
+            <div id="areaVal" class="value">-- Acres</div>
           </div>
           <div class="metric-card">
             <div class="label" data-i18n="elevationRange">Elevation</div>
-            <div id="elevVal" class="value">~336 m</div>
+            <div id="elevVal" class="value">-- m</div>
           </div>
           <div class="metric-card">
             <div class="label">Lithology</div>
-            <div id="lithologyVal" class="value" style="font-size: 11.5px; font-weight: 700; line-height: 1.2;">Weathered Gneiss</div>
+            <div id="lithologyVal" class="value" style="font-size: 11.5px; font-weight: 700; line-height: 1.2;">--</div>
           </div>
         </div>
 
         <!-- Plain Language Summary -->
         <div class="summary-card">
           <p id="summaryText">
-            Karun Farm 2 shows an overall High Potential. The most favorable groundwater recharge and secondary fracture intersections are concentrated along the central and lower drainage contours.
+            Tap anywhere on the satellite map, drop a pin on your farmland, or use your live GPS location to generate high-precision groundwater siting recommendations.
           </p>
         </div>
 

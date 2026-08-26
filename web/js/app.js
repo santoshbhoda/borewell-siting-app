@@ -1,23 +1,23 @@
 /**
- * BSMA GeoAI Borewell & Groundwater Siting Application (MVP + Phase 1)
- * Powered by Leaflet.js (100% Guaranteed Cross-Browser DOM Tile Rendering)
- * Features: Multi-terrain physics siting, KML upload, preset farm switching,
- * High-Res Satellite View toggle, WALTA compliance, and full PDF reporting.
+ * BSMA GeoAI Borewell & Groundwater Siting Application (Open Public Edition)
+ * Powered by Leaflet.js (DOM-based high-performance mapping)
+ * Features: Satellite-first imagery, Live GPS location tracking, Dockable/Collapsible report pane,
+ * Multi-terrain physics siting, KML upload, Dynamic pan-India lithology & basin classifier.
  */
 
 // Multi-lingual dictionary
 const I18N = {
   en: {
     appTitle: "Borewell Siting AI",
-    subTitle: "GeoAI Groundwater Prospecting (Musi Basin)",
+    subTitle: "Open GeoAI Groundwater Prospecting",
     meanPotential: "Mean Potential",
     landArea: "Land Area",
     elevationRange: "Elevation",
     topSpots: "Top Recommended Spots",
     drawCustomPlot: "Draw Custom Plot",
-    resetPlot: "Reset Farm",
+    resetPlot: "Reset Map View",
     waltaStatus: "WALTA Compliance",
-    waltaText: "Minimum 150m spacing between agricultural borewells required in Telangana hard-rock.",
+    waltaText: "Minimum 150m spacing between agricultural borewells required in hard-rock aquifers.",
     vesNoticeTitle: "Mandatory VES Field Verification",
     vesNoticeText: "Before drilling rig mobilization, conduct a 1D/2D Vertical Electrical Sounding (VES) resistivity survey at Spot #1 to verify deep fracture depth.",
     estimatedDepth: "Est. Depth",
@@ -32,12 +32,12 @@ const I18N = {
     shareReport: "Report",
     fullReportBtn: "Full Siting Report",
     addOutcome: "Record Outcome",
-    pinDropModeMsg: "📍 Pin-Drop Mode: Click anywhere on the map to evaluate a 300m radius parcel.",
-    polyDrawModeMsg: "📐 Polygon Mode: Click on the map to place corner points (at least 3) for your custom plot."
+    pinDropModeMsg: "📍 Pin-Drop Mode: Tap anywhere on the farmland to evaluate a 300m radius parcel.",
+    polyDrawModeMsg: "📐 Polygon Mode: Tap on the map to place corner points (at least 3) for your custom plot."
   },
   te: {
     appTitle: "బోరుబావి గుర్తింపు AI",
-    subTitle: "భూగర్భ జలాల అంచనా (మూసీ బేసిన్)",
+    subTitle: "భూగర్భ జలాల అంచనా వ్యవస్థ",
     meanPotential: "సగటు నీటి సామర్థ్యం",
     landArea: "భూమి విస్తీర్ణం",
     elevationRange: "ఎత్తు",
@@ -45,7 +45,7 @@ const I18N = {
     drawCustomPlot: "కొత్త భూమిని గీయండి",
     resetPlot: "రీసెట్ చేయండి",
     waltaStatus: "వాల్టా (WALTA) నిబంధనలు",
-    waltaText: "తెలంగాణ వాల్టా చట్టం ప్రకారం బోరుబావుల మధ్య కనీసం 150 మీటర్ల దూరం ఉండాలి.",
+    waltaText: "భూగర్భ జల నిబంధనల ప్రకారం వ్యవసాయ బోరుబావుల మధ్య కనీసం 150 మీటర్ల దూరం ఉండాలి.",
     vesNoticeTitle: "తప్పనిసరి VES రెసిస్టివిటీ సర్వే",
     vesNoticeText: "డ్రిల్లింగ్ చేయడానికి ముందు స్పాట్ #1 వద్ద తప్పనిసరిగా VES భూ-భౌతిక సర్వే చేయించుకుని నీటి పగులు లోతును నిర్ధారించుకోండి.",
     estimatedDepth: "అంచనా లోతు",
@@ -65,15 +65,15 @@ const I18N = {
   },
   hi: {
     appTitle: "बोरवेल चयन AI",
-    subTitle: "भूजल अन्वेषण प्रणाली (मूसी बेसिन)",
+    subTitle: "खुली भूजल अन्वेषण प्रणाली",
     meanPotential: "औसत भूजल क्षमता",
     landArea: "कुल क्षेत्रफल",
     elevationRange: "ऊंचाई",
     topSpots: "शीर्ष अनुशंसित स्थान",
     drawCustomPlot: "नया खेत चिह्नित करें",
-    resetPlot: "रीसेट करें",
+    resetPlot: "मानचित्र रीसेट करें",
     waltaStatus: "वाल्टा (WALTA) अनुपालन",
-    waltaText: "तेलंगाना वाल्टा नियमों के तहत बोरवेलों के बीच न्यूनतम 150 मीटर की दूरी अनिवार्य है।",
+    waltaText: "भूजल संरक्षण नियमों के तहत बोरवेलों के बीच न्यूनतम 150 मीटर की दूरी अनिवार्य है।",
     vesNoticeTitle: "अनिवार्य VES भू-भौतिकीय जांच",
     vesNoticeText: "बोरवेल ड्रिलिंग से पहले स्पॉट #1 पर VES विद्युत प्रतिरोधकता (Resistivity) सर्वेक्षण अवश्य करवाएं।",
     estimatedDepth: "अनुमानित गहराई",
@@ -99,10 +99,10 @@ let streetLayer = null;
 let satelliteLayer = null;
 let farmBoundaryLayer = null;
 let markers = [];
-let isSatellite = false;
+let userLocationMarker = null;
+let isSatellite = true; // SATELLITE VIEW BY DEFAULT!
+let isDrawerCollapsed = false;
 
-let defaultFarmGeoJSON = null;
-let mangoFarmGeoJSON = null;
 let currentAnalysis = null;
 let currentGeoJSON = null;
 let clientGrid = null;
@@ -118,10 +118,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupUIEventListeners();
   initPwaInstall();
   await loadData();
-  if (defaultFarmGeoJSON) {
-    renderFarmOnMap(defaultFarmGeoJSON);
-    renderFarmData(defaultFarmGeoJSON.farm_analysis);
-  }
 });
 
 /* PWA Service Worker Registration */
@@ -196,34 +192,14 @@ function updateLanguageTexts() {
 
 async function loadData() {
   try {
-    const [reportRes, mangoRes, gridRes] = await Promise.all([
-      fetch('data/farm_siting_report.geojson'),
-      fetch('data/mangofarm_siting_report.geojson').catch(() => null),
-      fetch('data/gwpi_grid.json')
-    ]);
-    
-    defaultFarmGeoJSON = await reportRes.json();
-    if (mangoRes && mangoRes.ok) {
-      mangoFarmGeoJSON = await mangoRes.json();
+    const gridRes = await fetch('data/gwpi_grid.json').catch(() => null);
+    if (gridRes && gridRes.ok) {
+      clientGrid = await gridRes.json();
+      localStorage.setItem('borewell_grid', JSON.stringify(clientGrid));
     }
-    clientGrid = await gridRes.json();
-    currentGeoJSON = defaultFarmGeoJSON;
-    
-    localStorage.setItem('borewell_default_farm', JSON.stringify(defaultFarmGeoJSON));
-    if (mangoFarmGeoJSON) {
-      localStorage.setItem('borewell_mango_farm', JSON.stringify(mangoFarmGeoJSON));
-    }
-    localStorage.setItem('borewell_grid', JSON.stringify(clientGrid));
   } catch (err) {
-    console.warn("Loading from offline LocalStorage:", err);
-    const cachedFarm = localStorage.getItem('borewell_default_farm');
-    const cachedMango = localStorage.getItem('borewell_mango_farm');
+    console.warn("Loading grid fallback:", err);
     const cachedGrid = localStorage.getItem('borewell_grid');
-    if (cachedFarm) {
-      defaultFarmGeoJSON = JSON.parse(cachedFarm);
-      currentGeoJSON = defaultFarmGeoJSON;
-    }
-    if (cachedMango) mangoFarmGeoJSON = JSON.parse(cachedMango);
     if (cachedGrid) clientGrid = JSON.parse(cachedGrid);
   }
 }
@@ -231,30 +207,39 @@ async function loadData() {
 function initMap() {
   if (map) return;
 
-  const farmCentroid = [17.43306, 79.08839];
+  // Default regional center across South/Central India
+  const initialCenter = [17.50, 78.50];
 
   map = L.map('map', {
     zoomControl: false,
     attributionControl: true
-  }).setView(farmCentroid, 16);
+  }).setView(initialCenter, 13);
 
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
 
-  // 1. High-Performance Street Basemap Layer (CartoDB Voyager multi-CDN)
+  // 1. High-Res Satellite Layer (ESRI World Imagery) - ACTIVE BY DEFAULT!
+  satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: '&copy; Esri World Imagery'
+  }).addTo(map);
+
+  // 2. High-Performance Street Basemap Layer (CartoDB Voyager multi-CDN)
   streetLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 20,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-  }).addTo(map);
-
-  // 2. High-Res Satellite Layer (ESRI World Imagery)
-  satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-    maxZoom: 19,
-    attribution: '&copy; Esri World Imagery'
   });
 
   map.on('click', handleMapClick);
+
+  // Trigger GPS Geolocation on load
+  initUserLocation();
+
+  // On mobile screens (width <= 768px), start with drawer collapsed for 100% full-screen satellite view
+  if (window.innerWidth <= 768) {
+    toggleDrawer(true);
+  }
 
   // Multiple resize invalidation triggers to guarantee rendering
   setTimeout(() => { if (map) map.invalidateSize(); }, 100);
@@ -266,6 +251,77 @@ function initMap() {
   });
 }
 
+/* User GPS Geolocation Tracking */
+function initUserLocation() {
+  if ('geolocation' in navigator) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        setUserGpsMarker(lat, lon);
+        map.setView([lat, lon], 16, { animate: true });
+      },
+      (err) => {
+        console.warn("GPS location permission:", err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
+  }
+}
+
+function locateUser() {
+  const banner = document.getElementById('instructionBanner');
+  const textEl = document.getElementById('instructionText');
+  
+  if (!navigator.geolocation) {
+    alert("Geolocation is not supported by your browser.");
+    return;
+  }
+
+  banner.classList.add('visible');
+  textEl.textContent = "📡 Acquiring high-precision GPS coordinates...";
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      setUserGpsMarker(lat, lon);
+      map.setView([lat, lon], 17, { animate: true });
+      textEl.textContent = `📍 Centered on your GPS Location (${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E)`;
+      setTimeout(() => { banner.classList.remove('visible'); }, 3500);
+    },
+    (err) => {
+      console.warn("GPS error:", err);
+      alert("Could not retrieve GPS location. Please allow location permissions in your browser.");
+      banner.classList.remove('visible');
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+function setUserGpsMarker(lat, lon) {
+  if (userLocationMarker) {
+    map.removeLayer(userLocationMarker);
+  }
+
+  const icon = L.divIcon({
+    className: 'custom-map-marker-container',
+    html: `
+      <div class="user-gps-marker">
+        <div class="user-gps-dot"></div>
+        <div class="user-gps-pulse"></div>
+      </div>
+    `,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10]
+  });
+
+  userLocationMarker = L.marker([lat, lon], { icon, zIndexOffset: 1000 })
+    .bindPopup(`<strong>📍 Your Live Location</strong><br/><code>${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E</code>`)
+    .addTo(map);
+}
+
+/* Satellite / Street Map Layer Toggle */
 function toggleSatelliteView() {
   if (!map) return;
   isSatellite = !isSatellite;
@@ -279,6 +335,33 @@ function toggleSatelliteView() {
     map.addLayer(streetLayer);
     if (btn) btn.classList.remove('active');
   }
+}
+
+/* Dock / Undock Results Side Pane */
+function toggleDrawer(forceState = null) {
+  const drawer = document.getElementById('resultsDrawer');
+  const restoreBtn = document.getElementById('btnRestoreDrawer');
+  const toggleBtn = document.getElementById('btnToggleDrawer');
+
+  if (forceState !== null) {
+    isDrawerCollapsed = forceState;
+  } else {
+    isDrawerCollapsed = !isDrawerCollapsed;
+  }
+
+  if (isDrawerCollapsed) {
+    drawer.classList.add('collapsed');
+    restoreBtn.classList.add('visible');
+    if (toggleBtn) toggleBtn.classList.remove('active');
+  } else {
+    drawer.classList.remove('collapsed');
+    restoreBtn.classList.remove('visible');
+    if (toggleBtn) toggleBtn.classList.add('active');
+  }
+
+  setTimeout(() => {
+    if (map) map.invalidateSize();
+  }, 300);
 }
 
 function renderFarmOnMap(geojson) {
@@ -354,9 +437,9 @@ function renderFarmOnMap(geojson) {
   }
 }
 
+/* Dynamic Regional Lithology Classifier Engine */
 function getRegionalLithology(lat, lon) {
   // 1. Maharashtra Deccan Volcanic Basalt (Deccan Traps)
-  // Strictly West of Lon 77.5°E in Maharashtra, or Vidarbha north of 19.8°N
   if (
     (lat >= 15.8 && lat <= 22.0 && lon >= 72.6 && lon < 77.5) || // Western Maharashtra, Pune, Solapur, Marathwada, Nashik
     (lat >= 19.8 && lat <= 21.8 && lon >= 77.0 && lon <= 79.8) || // Vidarbha (Nagpur, Wardha, Amravati)
@@ -443,6 +526,7 @@ function getRegionalLithology(lat, lon) {
   };
 }
 
+/* Dynamic District, State & River Basin Reverse-Geocoding Engine */
 function getRegionalLocationInfo(lat, lon) {
   // 1. Telangana Districts & Sub-basins
   if (lat >= 15.8 && lat <= 19.9 && lon >= 77.2 && lon <= 81.5) {
@@ -651,8 +735,23 @@ function renderFarmData(analysis) {
 }
 
 function setupUIEventListeners() {
+  // GPS Locate Button
+  const gpsBtn = document.getElementById('btnCurrentLocation');
+  if (gpsBtn) gpsBtn.addEventListener('click', locateUser);
+
+  // Satellite View Toggle Button
   const satBtn = document.getElementById('btnToggleSatellite');
   if (satBtn) satBtn.addEventListener('click', toggleSatelliteView);
+
+  // Details Panel Dock/Undock Buttons
+  const toggleDrawerBtn = document.getElementById('btnToggleDrawer');
+  if (toggleDrawerBtn) toggleDrawerBtn.addEventListener('click', () => toggleDrawer());
+
+  const dockBtn = document.getElementById('btnDockDrawer');
+  if (dockBtn) dockBtn.addEventListener('click', () => toggleDrawer(true));
+
+  const restoreBtn = document.getElementById('btnRestoreDrawer');
+  if (restoreBtn) restoreBtn.addEventListener('click', () => toggleDrawer(false));
 
   document.getElementById('btnDropPin').addEventListener('click', () => setToolMode('pin'));
   document.getElementById('btnDrawPolygon').addEventListener('click', () => setToolMode('polygon'));
@@ -668,12 +767,6 @@ function setupUIEventListeners() {
         handleKmlUpload(e.target.files[0]);
       }
     });
-  }
-
-  // Farm Preset Selector
-  const presetSelect = document.getElementById('farmPresetSelect');
-  if (presetSelect) {
-    presetSelect.addEventListener('change', (e) => handlePresetFarmChange(e.target.value));
   }
 
   // Modal Report Listeners
@@ -692,19 +785,6 @@ function setupUIEventListeners() {
   document.getElementById('btnCloseFeedbackModal').addEventListener('click', closeFeedbackModal);
   document.getElementById('btnCancelFeedback').addEventListener('click', closeFeedbackModal);
   document.getElementById('feedbackForm').addEventListener('submit', handleFeedbackSubmit);
-}
-
-function handlePresetFarmChange(presetKey) {
-  setToolMode(null);
-  if (presetKey === 'mango_farm' && mangoFarmGeoJSON) {
-    renderFarmOnMap(mangoFarmGeoJSON);
-    renderFarmData(mangoFarmGeoJSON.farm_analysis);
-    map.setView([mangoFarmGeoJSON.farm_analysis.centroid.lat, mangoFarmGeoJSON.farm_analysis.centroid.lon], 16);
-  } else if (presetKey === 'karun_farm_2' && defaultFarmGeoJSON) {
-    renderFarmOnMap(defaultFarmGeoJSON);
-    renderFarmData(defaultFarmGeoJSON.farm_analysis);
-    map.setView([defaultFarmGeoJSON.farm_analysis.centroid.lat, defaultFarmGeoJSON.farm_analysis.centroid.lon], 16);
-  }
 }
 
 /* KML File Upload & Ingestion Parser */
@@ -762,19 +842,6 @@ function parseAndEvaluateKML(kmlText, fileName = "Uploaded Farm") {
 
     evaluateCustomPolygon(points, farmName);
 
-    const presetSelect = document.getElementById('farmPresetSelect');
-    if (presetSelect) {
-      let customOpt = presetSelect.querySelector('option[value="custom"]');
-      if (!customOpt) {
-        customOpt = document.createElement('option');
-        customOpt.value = 'custom';
-        presetSelect.appendChild(customOpt);
-      }
-      customOpt.textContent = `📁 ${farmName}`;
-      customOpt.disabled = false;
-      customOpt.selected = true;
-    }
-
     const banner = document.getElementById('instructionBanner');
     const textEl = document.getElementById('instructionText');
     banner.classList.add('visible');
@@ -798,7 +865,6 @@ function setToolMode(mode) {
     currentToolMode = null;
     pinBtn.classList.remove('active');
     polyBtn.classList.remove('active');
-    banner.classList.remove('visible');
     drawnPoints = [];
     return;
   }
@@ -817,7 +883,11 @@ function setToolMode(mode) {
 }
 
 function handleMapClick(e) {
-  if (!currentToolMode) return;
+  if (!currentToolMode) {
+    // Default click behavior: If user taps on map, evaluate a 250m parcel around the tap
+    evaluatePinDrop(e.latlng.lng, e.latlng.lat);
+    return;
+  }
   const lat = e.latlng.lat;
   const lng = e.latlng.lng;
 
@@ -833,7 +903,7 @@ function handleMapClick(e) {
 }
 
 function evaluatePinDrop(lon, lat) {
-  const radiusDeg = 0.0022; // ~240m radius buffer
+  const radiusDeg = 0.0022; // ~240m radius parcel buffer
   const coords = [];
   for (let i = 0; i < 16; i++) {
     const angle = (i / 16) * Math.PI * 2;
@@ -844,7 +914,7 @@ function evaluatePinDrop(lon, lat) {
   }
   coords.push(coords[0]);
 
-  evaluateCustomPolygon(coords, `Pin Sited Plot (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
+  evaluateCustomPolygon(coords, `Farmland Plot (${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E)`);
 }
 
 async function fetchTerrainElevationProfile(lats, lons) {
@@ -852,7 +922,7 @@ async function fetchTerrainElevationProfile(lats, lons) {
     const latStr = lats.map(l => l.toFixed(5)).join(',');
     const lonStr = lons.map(l => l.toFixed(5)).join(',');
     const url = `https://api.open-meteo.com/v1/elevation?latitude=${latStr}&longitude=${lonStr}`;
-    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    const res = await fetch(url, { signal: AbortSignal.timeout(3500) });
     if (res.ok) {
       const data = await res.json();
       if (data && data.elevation && data.elevation.length === lats.length) {
@@ -868,7 +938,7 @@ async function fetchTerrainElevationProfile(lats, lons) {
   });
 }
 
-async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
+async function evaluateCustomPolygon(points, customName = "Farmland Parcel") {
   const coords = points[0][0] === points[points.length-1][0] ? points : [...points, points[0]];
   
   let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
@@ -889,7 +959,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
   const banner = document.getElementById('instructionBanner');
   const textEl = document.getElementById('instructionText');
   banner.classList.add('visible');
-  textEl.textContent = `🛰️ Analyzing 3D terrain elevation, slope, and hydrogeological fractures...`;
+  textEl.textContent = `🛰️ Analyzing 3D satellite topography, fracture corridors & lithology...`;
 
   const deltaLat = Math.max(0.0012, (maxLat - minLat) * 0.5);
   const deltaLon = Math.max(0.0012, (maxLon - minLon) * 0.5);
@@ -926,7 +996,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     spot1Score = 28.0; spot2Score = 24.0; spot3Score = 20.0;
     estDepth = "0 - 80 ft (Silt Bed)";
     estYield = "Surface Inundated (High Contamination Risk)";
-    hydroRationale = "⚠️ Site located in an active lake/tank bed or drainage sink. Borewell drilling inside water bodies is prohibited under Telangana WALTA Act.";
+    hydroRationale = "⚠️ Site located in an active lake/tank bed or drainage sink. Borewell drilling inside water bodies is prohibited under Groundwater Regulations (WALTA).";
     summaryEn = `${customName} is located inside or immediately adjacent to a surface water tank bed/drainage channel. Borewell drilling is prohibited under WALTA Act.`;
     summaryTe = `${customName} చెరువు లేదా ఉపరితల నీటి ప్రాంతంలో ఉన్నది. వాల్టా చట్టం ప్రకారం ఇక్కడ బోరుబావి వేయడం నిషిద్ధం.`;
     summaryHi = `${customName} जल निकाय / तालाब क्षेत्र में स्थित है। वाल्टा अधिनियम के तहत यहाँ बोरवेल खनन प्रतिबंधित है।`;
@@ -936,7 +1006,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     spot1Score = Math.max(22.0, meanScore + 3.0);
     spot2Score = Math.max(18.0, meanScore - 2.0);
     spot3Score = Math.max(15.0, meanScore - 5.0);
-    estDepth = "550 - 750+ ft (Deep Hard Granite)";
+    estDepth = "550 - 750+ ft (Deep Hard Rock)";
     estYield = "Dry to <500 LPH (High Risk of Failure)";
     hydroRationale = `⚠️ High Runoff Zone: Steep terrain (${slopePct.toFixed(1)}% slope) and unweathered massive bedrock result in negligible recharge and extreme dry well risk (>80% failure).`;
     summaryEn = `${customName} is located on a steep rocky hill/ridge (Slope: ${slopePct.toFixed(1)}%, Elevation: ${elevCenter}m). Surface runoff exceeds 90% and infiltration is negligible. High risk of dry borewell.`;
@@ -950,7 +1020,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
     spot3Score = meanScore - 4.0;
     estDepth = "350 - 480 ft";
     estYield = "800 - 1,800 LPH (~0.5 - 1.0 inch yield)";
-    hydroRationale = `Located on a moderate upland pediplain (${slopePct.toFixed(1)}% slope). Groundwater recharge is moderate; requires drilling through 40-50ft casing to tap secondary fractures at 350-450 ft.`;
+    hydroRationale = `Located on a moderate upland pediplain (${slopePct.toFixed(1)}% slope). Groundwater recharge is moderate; requires drilling through casing to tap secondary fractures at 350-450 ft.`;
     summaryEn = `${customName} exhibits moderate groundwater potential (${meanScore}/100) on an upland pediplain (${slopePct.toFixed(1)}% slope). Moderate expected yield of 800-1,800 LPH.`;
     summaryTe = `${customName} మధ్యస్థ భూగర్భ జలాల సామర్థ్యాన్ని కలిగి ఉంది (స్కోరు: ${meanScore}/100, వాలు: ${slopePct.toFixed(1)}%). అంచనా ప్రవాహం 800-1,800 LPH.`;
     summaryHi = `${customName} में मध्यम भूजल क्षमता (${meanScore}/100) पाई गई है। 350-480 फीट गहराई पर जल प्रवाह 800-1,800 LPH अनुमानित है।`;
@@ -996,7 +1066,7 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
       slope_pct: Number((slopePct + 0.3).toFixed(1)),
       estimated_depth_range: estDepth,
       expected_yield_range: estYield,
-      hydro_summary: `Secondary recharge spot positioned >=150m from Spot #1 in compliance with WALTA distance regulations. ${hydroRationale.split('(')[0]}`
+      hydro_summary: `Secondary recharge spot positioned >=150m from Spot #1 in compliance with spacing regulations. ${hydroRationale.split('(')[0]}`
     },
     {
       rank: 3,
@@ -1049,6 +1119,9 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
   renderFarmOnMap(customGeoJSON);
   renderFarmData(customAnalysis);
   
+  // Un-dock / expand the drawer to show the results to the user
+  toggleDrawer(false);
+
   if (currentToolMode === 'polygon') {
     setToolMode(null);
   }
@@ -1059,9 +1132,26 @@ async function evaluateCustomPolygon(points, customName = "Custom Drawn Plot") {
 
 function resetToDefaultFarm() {
   setToolMode(null);
-  const presetSelect = document.getElementById('farmPresetSelect');
-  if (presetSelect) presetSelect.value = 'karun_farm_2';
-  handlePresetFarmChange('karun_farm_2');
+  if (farmBoundaryLayer) {
+    map.removeLayer(farmBoundaryLayer);
+    farmBoundaryLayer = null;
+  }
+  markers.forEach(m => map.removeLayer(m));
+  markers = [];
+  currentAnalysis = null;
+  currentGeoJSON = null;
+
+  document.getElementById('farmNameDisplay').textContent = "Farmland Groundwater Siting";
+  document.getElementById('regionSubText').textContent = "Select or drop a pin to evaluate";
+  document.getElementById('farmCategoryDisplay').textContent = "Ready";
+  document.getElementById('meanScoreVal').textContent = "-- / 100";
+  document.getElementById('areaVal').textContent = "-- Acres";
+  document.getElementById('elevVal').textContent = "-- m";
+  document.getElementById('lithologyVal').textContent = "--";
+  document.getElementById('summaryText').textContent = "Tap anywhere on the satellite map, drop a pin on your farmland, or use your live GPS location to generate high-precision groundwater siting recommendations.";
+  document.getElementById('candidateSpotsList').innerHTML = '';
+
+  initUserLocation();
 }
 
 /* ==========================================================================
@@ -1069,7 +1159,10 @@ function resetToDefaultFarm() {
    ========================================================================== */
 
 function openReportModal() {
-  if (!currentAnalysis) return;
+  if (!currentAnalysis) {
+    alert("Please drop a pin on the map or upload a KML first to generate a full siting report.");
+    return;
+  }
   
   document.getElementById('modalFarmName').textContent = currentAnalysis.farm_name;
   document.getElementById('modalFarmArea').textContent = `${currentAnalysis.farm_area_acres} Acres (${currentAnalysis.farm_area_hectares} ha)`;
@@ -1094,11 +1187,7 @@ function openReportModal() {
 
   const mapImg = document.getElementById('modalMapImg');
   if (mapImg) {
-    if (currentAnalysis.farm_name.includes('Mango') || currentAnalysis.farm_name.includes('Farmland 1')) {
-      mapImg.src = 'data/mangofarm_siting_plan.png';
-    } else {
-      mapImg.src = 'data/farm_siting_plan.png';
-    }
+    mapImg.src = 'data/farm_siting_plan.png';
   }
 
   const tBody = document.getElementById('modalTableBody');
@@ -1125,7 +1214,7 @@ function openReportModal() {
     card.className = `rationale-card ${pt.rank === 1 ? 'primary' : ''}`;
     card.innerHTML = `
       <strong>Spot #${pt.rank} (${pt.lat.toFixed(5)}°N, ${pt.lon.toFixed(5)}°E) — Geological Profile:</strong>
-      <p style="margin: 4px 0 0 0; line-height: 1.4; color: #334155;">${pt.hydro_summary} Recommended drilling technique: DTH rotary hammer with 40-60 ft casing.</p>
+      <p style="margin: 4px 0 0 0; line-height: 1.4; color: #334155;">${pt.hydro_summary} ${litho.drilling_technique}. Casing requirement: ${litho.casing_depth}.</p>
     `;
     ratContainer.appendChild(card);
   });
@@ -1145,29 +1234,6 @@ function closeReportModal() {
 /* 1. Download Full PDF Report */
 function downloadPdfReport() {
   if (!currentAnalysis) return;
-
-  const isKarunFarm = defaultFarmGeoJSON && currentAnalysis.farm_name === defaultFarmGeoJSON.farm_analysis.farm_name;
-  const isMangoFarm = currentAnalysis.farm_name.includes('Mango') || currentAnalysis.farm_name.includes('Farmland 1');
-
-  if (isKarunFarm) {
-    const a = document.createElement('a');
-    a.href = 'data/Borewell_Siting_Full_Report.pdf';
-    a.download = `Borewell_Siting_Full_Report_${currentAnalysis.farm_name.replace(/\s+/g, '_')}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    return;
-  }
-
-  if (isMangoFarm) {
-    const a = document.createElement('a');
-    a.href = 'data/Borewell_Siting_Full_Report_MangoFarm.pdf';
-    a.download = `Borewell_Siting_Full_Report_MangoFarm.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    return;
-  }
 
   const element = document.getElementById('printableReportContent');
   const btn = document.getElementById('btnDownloadPDF');
@@ -1202,6 +1268,7 @@ function downloadPdfReport() {
 
 /* 2. Download Standalone Offline HTML Report */
 function downloadHtmlReport() {
+  if (!currentAnalysis) return;
   const elementHtml = document.getElementById('printableReportContent').outerHTML;
   const fullHtml = `<!DOCTYPE html>
 <html lang="en">
@@ -1241,7 +1308,8 @@ function downloadHtmlReport() {
 
 /* 3. Download GeoJSON Dataset */
 function downloadGeoJsonReport() {
-  const dataToExport = currentGeoJSON || defaultFarmGeoJSON;
+  if (!currentAnalysis) return;
+  const dataToExport = currentGeoJSON;
   const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/geo+json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1253,6 +1321,7 @@ function downloadGeoJsonReport() {
 
 /* 4. Download CSV Coordinates Table */
 function downloadCsvReport() {
+  if (!currentAnalysis) return;
   let csv = "Rank,Label,Latitude,Longitude,GWPI_Score,Potential_Category,Elevation_m,Slope_Pct,Estimated_Depth,Expected_Yield,Geological_Rationale\n";
   currentAnalysis.candidate_points.forEach(pt => {
     csv += `"${pt.rank}","${pt.label}","${pt.lat}","${pt.lon}","${pt.gwpi_score}","${pt.potential_category}","${pt.elevation_m}","${pt.slope_pct}","${pt.estimated_depth_range}","${pt.expected_yield_range}","${pt.hydro_summary.replace(/"/g, '""')}"\n`;
@@ -1313,8 +1382,8 @@ async function handleFeedbackSubmit(e) {
   localStorage.setItem('borewell_outcomes', JSON.stringify(existingOutcomes));
 
   try {
-    const plotId = (currentAnalysis && currentAnalysis.id) || "pilot_farm";
-    await fetch(`http://localhost:8000/api/v1/plots/${plotId}/feedback`, {
+    const plotId = (currentAnalysis && currentAnalysis.id) || "custom_farm";
+    await fetch(`https://bsma-borewell-api.onrender.com/api/v1/plots/${plotId}/feedback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

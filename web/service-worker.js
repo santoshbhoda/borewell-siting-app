@@ -1,9 +1,9 @@
 /**
- * BSMA GeoAI Borewell Siting App — Service Worker (v7.0.0)
- * Bulletproof local Leaflet DOM basemap streaming & 100% offline caching.
+ * BSMA GeoAI Borewell Siting App — Service Worker (v8.0.0)
+ * Bulletproof local Leaflet DOM basemap streaming, Satellite-first & 100% offline caching.
  */
 
-const CACHE_NAME = 'borewell-ai-v7.0.0';
+const CACHE_NAME = 'borewell-ai-v8.0.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
@@ -14,14 +14,9 @@ const STATIC_ASSETS = [
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
-  './data/farm_siting_report.geojson',
-  './data/mangofarm_siting_report.geojson',
   './data/gwpi_grid.json',
   './data/catchment_gwpi_map.png',
-  './data/farm_siting_plan.png',
-  './data/mangofarm_siting_plan.png',
-  './data/Borewell_Siting_Full_Report.pdf',
-  './data/Borewell_Siting_Full_Report_MangoFarm.pdf'
+  './data/farm_siting_plan.png'
 ];
 
 self.addEventListener('install', (event) => {

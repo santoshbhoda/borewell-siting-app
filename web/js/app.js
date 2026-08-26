@@ -388,13 +388,15 @@ function setUserGpsMarker(lat, lon, accuracy = 20) {
     map.removeLayer(userAccuracyCircle);
   }
 
-  // Visual Accuracy Circle (shows exact GPS radius precision)
-  userAccuracyCircle = L.circle([lat, lon], {
-    radius: Math.max(5, accuracy),
-    color: accuracy <= 30 ? '#16a34a' : '#0284c7',
-    weight: 1.5,
-    fillColor: accuracy <= 30 ? '#16a34a' : '#0284c7',
-    fillOpacity: 0.14
+  // Fixed 2 to 3 cm screen-radius visual indicator (~80px = ~2.2 cm across laptop, desktop, mobile)
+  userAccuracyCircle = L.circleMarker([lat, lon], {
+    radius: 80, // Exactly ~2.2 cm fixed radius on screen
+    color: '#0284c7',
+    weight: 2,
+    dashArray: '5, 5',
+    fillColor: '#0284c7',
+    fillOpacity: 0.08,
+    interactive: false
   }).addTo(map);
 
   // Pulsing Pin Beacon

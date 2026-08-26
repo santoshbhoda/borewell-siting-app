@@ -73,6 +73,36 @@ body, html {
   border: none !important;
 }
 
+/* Live Coordinates Display (Bottom-Right beside Leaflet attribution) */
+.leaflet-control-coordinates {
+  background: rgba(255, 255, 255, 0.90);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #0f172a;
+  font-weight: 700;
+  border: 1px solid rgba(203, 213, 225, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  margin-right: 6px !important;
+  margin-bottom: 3px !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  pointer-events: auto;
+  user-select: all;
+}
+
+.leaflet-bottom.leaflet-right {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
 /* Top App Header */
 .top-header {
   position: absolute;

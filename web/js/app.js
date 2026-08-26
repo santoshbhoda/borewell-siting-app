@@ -231,6 +231,34 @@ function initMap() {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
   });
 
+  // 3. Live Coordinates Control (Displayed in bottom-right bar beside Leaflet attribution)
+  const CoordinatesControl = L.Control.extend({
+    options: { position: 'bottomright' },
+    onAdd: function () {
+      const div = L.DomUtil.create('div', 'leaflet-control-coordinates');
+      div.id = 'liveCoordinatesDisplay';
+      div.innerHTML = `📍 <span>17.50000°N, 78.50000°E</span>`;
+      div.title = "Live Cursor / Center Coordinates (Click/Copy)";
+      return div;
+    }
+  });
+  new CoordinatesControl().addTo(map);
+
+  map.on('mousemove', (e) => {
+    const el = document.getElementById('liveCoordinatesDisplay');
+    if (el) {
+      el.innerHTML = `📍 <span>${e.latlng.lat.toFixed(5)}°N, ${e.latlng.lng.toFixed(5)}°E</span>`;
+    }
+  });
+
+  map.on('move', () => {
+    const center = map.getCenter();
+    const el = document.getElementById('liveCoordinatesDisplay');
+    if (el) {
+      el.innerHTML = `📍 <span>${center.lat.toFixed(5)}°N, ${center.lng.toFixed(5)}°E</span>`;
+    }
+  });
+
   map.on('click', handleMapClick);
 
   // Trigger GPS Geolocation on load

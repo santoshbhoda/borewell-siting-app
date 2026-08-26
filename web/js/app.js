@@ -253,88 +253,130 @@ function initMap() {
 
 let userAccuracyCircle = null;
 let gpsWatchId = null;
+let isTrackingGps = false;
+let bestGpsAccuracy = Infinity;
 
 /* High-Precision Hardware GPS Geolocation Tracking */
 function initUserLocation() {
   if ('geolocation' in navigator) {
-    // Stage 1: Request instant zero-cache hardware GPS fix
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        handleGpsPosition(pos, false);
-      },
-      (err) => {
-        console.warn("GPS location notice:", err.message);
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-    );
+    // Start active satellite acquisition immediately on load
+    startHardwareGpsTracking(false);
   }
 }
 
 function locateUser() {
-  const banner = document.getElementById('instructionBanner');
-  const textEl = document.getElementById('instructionText');
+  const gpsBtn = document.getElementById('btnCurrentLocation');
   
   if (!navigator.geolocation) {
     alert("Geolocation is not supported by your device browser.");
     return;
   }
 
+  // Toggle active live tracking
+  if (isTrackingGps && gpsWatchId !== null) {
+    stopHardwareGpsTracking();
+    if (gpsBtn) gpsBtn.classList.remove('active');
+    const banner = document.getElementById('instructionBanner');
+    const textEl = document.getElementById('instructionText');
+    textEl.textContent = "📍 GPS Live Tracking paused.";
+    setTimeout(() => { banner.classList.remove('visible'); }, 2500);
+    return;
+  }
+
+  if (gpsBtn) gpsBtn.classList.add('active');
+  startHardwareGpsTracking(true);
+}
+
+function startHardwareGpsTracking(forceUserFocus = true) {
+  const banner = document.getElementById('instructionBanner');
+  const textEl = document.getElementById('instructionText');
+  const gpsBtn = document.getElementById('btnCurrentLocation');
+  
   banner.classList.add('visible');
-  textEl.textContent = "📡 Locking onto satellite GPS signals (acquiring high precision)...";
+  textEl.textContent = "📡 Connecting to GPS satellites (acquiring pinpoint meter accuracy)...";
 
   if (gpsWatchId !== null) {
     navigator.geolocation.clearWatch(gpsWatchId);
     gpsWatchId = null;
   }
 
-  let fixCount = 0;
+  isTrackingGps = true;
+  bestGpsAccuracy = Infinity;
+  let readingCount = 0;
 
-  // Start continuous satellite watch for progressively refined precision
+  const geoOptions = {
+    enableHighAccuracy: true,
+    timeout: 30000,
+    maximumAge: 0 // Strictly force live satellite hardware reading, zero cached cell-tower fixes!
+  };
+
   gpsWatchId = navigator.geolocation.watchPosition(
     (pos) => {
-      fixCount++;
-      handleGpsPosition(pos, true);
+      readingCount++;
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const accuracy = pos.coords.accuracy || 50;
 
-      const acc = Math.round(pos.coords.accuracy);
-      if (acc <= 30 || fixCount >= 4) {
-        // High precision achieved (<=30m), stop active watch to conserve battery
-        if (gpsWatchId !== null) {
-          navigator.geolocation.clearWatch(gpsWatchId);
-          gpsWatchId = null;
-        }
+      // Track best accuracy achieved
+      if (accuracy < bestGpsAccuracy) {
+        bestGpsAccuracy = accuracy;
+      }
+
+      handleGpsPosition(pos, forceUserFocus || readingCount <= 2);
+
+      const accMeters = Math.round(accuracy);
+
+      if (accuracy <= 25) {
+        textEl.innerHTML = `✓ <strong>Pinpoint Satellite GPS Lock:</strong> ±${accMeters}m (${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E)`;
+        if (gpsBtn) gpsBtn.classList.add('active');
+      } else if (accuracy <= 80) {
+        textEl.innerHTML = `📡 Refining GPS position: ±${accMeters}m... Stand in open sky for meter accuracy.`;
+      } else {
+        textEl.innerHTML = `📡 Cell/WiFi Triangulation: ±${accMeters}m.<br/><span style="font-size: 10px; color: #b45309;">⚠️ On phone, tap 🔒 in browser address bar & toggle <strong>"Precise Location"</strong> for exact farm position.</span>`;
+      }
+
+      if (accuracy <= 25 && readingCount > 5) {
+        setTimeout(() => {
+          if (accuracy <= 25) banner.classList.remove('visible');
+        }, 5000);
       }
     },
     (err) => {
-      console.warn("GPS error:", err);
-      textEl.textContent = "⚠️ Could not acquire GPS lock. Please ensure GPS/Location is enabled in device settings.";
-      setTimeout(() => { banner.classList.remove('visible'); }, 5000);
+      console.warn("GPS Error:", err);
+      let errMsg = "⚠️ GPS acquisition timeout or unavailable.";
+      if (err.code === 1) { // PERMISSION_DENIED
+        errMsg = "⚠️ Location permission denied. Please tap the 🔒 icon in your browser URL bar and allow 'Precise Location'.";
+      } else if (err.code === 2) { // POSITION_UNAVAILABLE
+        errMsg = "⚠️ Satellite GPS signal unavailable. Please ensure Location/GPS is turned ON in phone settings.";
+      }
+      textEl.innerHTML = errMsg;
+      if (gpsBtn) gpsBtn.classList.remove('active');
+      isTrackingGps = false;
+      setTimeout(() => { banner.classList.remove('visible'); }, 7000);
     },
-    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+    geoOptions
   );
 }
 
-function handleGpsPosition(pos, showFeedback = false) {
+function stopHardwareGpsTracking() {
+  if (gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(gpsWatchId);
+    gpsWatchId = null;
+  }
+  isTrackingGps = false;
+}
+
+function handleGpsPosition(pos, autoPan = true) {
   const lat = pos.coords.latitude;
   const lon = pos.coords.longitude;
   const accuracy = pos.coords.accuracy || 15;
 
   setUserGpsMarker(lat, lon, accuracy);
 
-  // Zoom based on accuracy: tighter zoom for higher accuracy
-  const targetZoom = accuracy < 50 ? 17 : accuracy < 200 ? 16 : 15;
-  map.setView([lat, lon], targetZoom, { animate: true });
-
-  if (showFeedback) {
-    const banner = document.getElementById('instructionBanner');
-    const textEl = document.getElementById('instructionText');
-    banner.classList.add('visible');
-    
-    if (accuracy <= 50) {
-      textEl.textContent = `✓ High-Precision GPS Lock: ±${Math.round(accuracy)}m (${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E)`;
-    } else {
-      textEl.textContent = `📍 GPS Position: ±${Math.round(accuracy)}m accuracy (${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E)`;
-    }
-    setTimeout(() => { banner.classList.remove('visible'); }, 4000);
+  if (autoPan) {
+    // Zoom tightly into the farmland when accuracy is good
+    const targetZoom = accuracy <= 35 ? 18 : accuracy <= 150 ? 17 : accuracy <= 500 ? 16 : 15;
+    map.setView([lat, lon], targetZoom, { animate: true });
   }
 }
 
@@ -348,11 +390,11 @@ function setUserGpsMarker(lat, lon, accuracy = 20) {
 
   // Visual Accuracy Circle (shows exact GPS radius precision)
   userAccuracyCircle = L.circle([lat, lon], {
-    radius: Math.max(8, accuracy),
-    color: '#0284c7',
+    radius: Math.max(5, accuracy),
+    color: accuracy <= 30 ? '#16a34a' : '#0284c7',
     weight: 1.5,
-    fillColor: '#0284c7',
-    fillOpacity: 0.12
+    fillColor: accuracy <= 30 ? '#16a34a' : '#0284c7',
+    fillOpacity: 0.14
   }).addTo(map);
 
   // Pulsing Pin Beacon
@@ -360,19 +402,21 @@ function setUserGpsMarker(lat, lon, accuracy = 20) {
     className: 'custom-map-marker-container',
     html: `
       <div class="user-gps-marker">
-        <div class="user-gps-dot"></div>
-        <div class="user-gps-pulse"></div>
+        <div class="user-gps-dot" style="background-color: ${accuracy <= 30 ? '#16a34a' : '#0284c7'};"></div>
+        <div class="user-gps-pulse" style="background: ${accuracy <= 30 ? 'rgba(22, 163, 74, 0.45)' : 'rgba(2, 132, 199, 0.45)'};"></div>
       </div>
     `,
     iconSize: [20, 20],
     iconAnchor: [10, 10]
   });
 
+  const accText = accuracy <= 30 ? `<span style="color: #16a34a; font-weight: bold;">±${Math.round(accuracy)} meters (High-Precision GPS)</span>` : `±${Math.round(accuracy)} meters`;
+
   const popupHtml = `
     <div style="font-family: sans-serif; padding: 4px;">
-      <strong style="color: #0284c7;">📍 Your Live Location</strong><br/>
+      <strong style="color: #0284c7;">📍 Live GPS Location</strong><br/>
       <code>${lat.toFixed(5)}°N, ${lon.toFixed(5)}°E</code><br/>
-      <span style="font-size: 10.5px; color: #64748b;">GPS Accuracy: ±${Math.round(accuracy)} meters</span>
+      <span style="font-size: 11px; color: #475569;">Precision: ${accText}</span>
     </div>
   `;
 

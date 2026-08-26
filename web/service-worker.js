@@ -3,7 +3,7 @@
  * Bulletproof local Leaflet DOM basemap streaming, Satellite-first & 100% offline caching.
  */
 
-const CACHE_NAME = 'borewell-ai-v8.0.0';
+const CACHE_NAME = 'borewell-ai-v8.1.0';
 const STATIC_ASSETS = [
   './',
   './index.html',
